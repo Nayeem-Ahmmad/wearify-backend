@@ -1,20 +1,26 @@
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from rest_framework.response import Response
+from django.contrib.auth.models import User
+
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
     Review, Wishlist
 )
 from .serializers import (
-    UserProfileSerializer, AddressSerializer, CategorySerializer,
+    RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
     WishlistSerializer
 )
 
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.filter(parent=None)
