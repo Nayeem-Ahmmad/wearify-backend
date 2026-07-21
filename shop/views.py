@@ -3,6 +3,9 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from django.contrib.auth.models import User
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+from .filters import ProductFilter
 
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
@@ -39,26 +42,15 @@ class TagViewSet(viewsets.ModelViewSet):
     serializer_class = TagSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     lookup_field = 'slug'
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        category = self.request.query_params.get('category')
-        brand = self.request.query_params.get('brand')
-        search = self.request.query_params.get('search')
-        if category:
-            qs = qs.filter(category__slug=category)
-        if brand:
-            qs = qs.filter(brand__id=brand)
-        if search:
-            qs = qs.filter(name__icontains=search)
-        return qs
-
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_class = ProductFilter
+    search_fields = ['name', 'description']
+    ordering_fields = ['base_price', 'created_at']
 
 class AddressViewSet(viewsets.ModelViewSet):
     serializer_class = AddressSerializer
