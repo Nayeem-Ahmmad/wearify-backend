@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView
+    PaymentFailView, PaymentCancelView
 )
 
 router = DefaultRouter()
@@ -26,4 +26,6 @@ urlpatterns = [
     path('payment/initiate/<int:order_id>/', InitiatePaymentView.as_view(), name='payment-initiate'),
     path('payment/success/<int:order_id>/', PaymentSuccessView.as_view(), name='payment-success'),
     path('payment/fail/<int:order_id>/', PaymentFailView.as_view(), name='payment-fail'),
+    path('payment/cancel/<int:order_id>/', PaymentCancelView.as_view(), name='payment-cancel'),
+
 ]

@@ -1,14 +1,19 @@
+from xml.dom import ValidationErr
+
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from .filters import ProductFilter
+from django.urls import reverse
 from rest_framework.pagination import PageNumberPagination
 
-from sslcommerz_lib import SSLCOMMERZ
+import logging
+logger = logging.getLogger(__name__)
+from sslcommerz_lib import SSLCOMMERZ, sslcommerz
 from django.conf import settings
 
 from .models import (
@@ -220,74 +225,253 @@ class WishlistViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
-#--------------Payment getway--------------------------------------------------
+
+#--------------- Payment Getway -------------------------------------------------
+
+
 class InitiatePaymentView(generics.GenericAPIView):
+
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, order_id):
-        order = get_object_or_404(Order, id=order_id, user=request.user)
+        order = self._get_validated_order(order_id, request.user)
 
+        validation_error = self._validate_order_payable(order)
+        if validation_error:
+            return validation_error
+
+        customer_data = self._get_customer_data(request, order)
+        if isinstance(customer_data, Response):
+            return customer_data
+
+        post_body = self._prepare_sslcommerz_payload(order, request, customer_data)
+        sslcz = self._get_sslcommerz_client()
+
+        try:
+            response = sslcz.createSession(post_body)
+        except Exception as e:
+            logger.error(f"SSLCOMMERZ session creation failed: {str(e)}")
+            return Response(
+                {"error": "Payment gateway is temporarily unavailable. Please try again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        if not response or 'GatewayPageURL' not in response:
+            logger.error(f"SSLCOMMERZ invalid response: {response}")
+            return Response(
+                {"error": "Failed to initiate payment. Please try again."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self._create_payment_record(order)
+
+        return Response({
+            'payment_url': response.get('GatewayPageURL'),
+            'order_id': order.id,
+            'transaction_id': order.order_number
+        }, status=status.HTTP_200_OK)
+
+    def _get_validated_order(self, order_id, user):
+        return get_object_or_404(Order, id=order_id, user=user)
+
+    def _validate_order_payable(self, order):
+        if order.status in ['confirmed', 'paid', 'shipped', 'delivered']:
+            return Response(
+                {"error": "This order has already been processed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if order.status == 'cancelled':
+            return Response(
+                {"error": "This order has been cancelled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if order.total_amount <= 0:
+            return Response(
+                {"error": "Invalid order amount."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return None
+
+    def _get_customer_data(self, request, order):
+        phone = request.data.get('phone_number')
+
+        if not phone and order.shipping_address:
+            phone = order.shipping_address.phone
+
+        if not phone and hasattr(request.user, 'profile'):
+            phone = request.user.profile.phone
+
+        if not phone:
+            return Response(
+                {"error": "Phone number is required for payment. Please add a phone number to your profile or shipping address."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return {
+            'phone': phone,
+            'address': order.shipping_address,
+            'email': request.user.email or 'customer@example.com',
+            'name': request.user.get_full_name() or request.user.username
+        }
+
+    def _prepare_sslcommerz_payload(self, order, request, customer_data):
+        base_url = self._get_base_url(request)
+
+        success_url = f"{base_url}{reverse('payment-success', kwargs={'order_id': order.id})}"
+        fail_url = f"{base_url}{reverse('payment-fail', kwargs={'order_id': order.id})}"
+        cancel_url = f"{base_url}{reverse('payment-cancel', kwargs={'order_id': order.id})}"
+
+        product_names = self._get_product_names(order)
+        total_items = self._get_total_items(order)
+        address = customer_data['address']
+
+        return {
+            'total_amount': str(order.total_amount),
+            'currency': 'BDT',
+            'tran_id': order.order_number,
+            'success_url': success_url,
+            'fail_url': fail_url,
+            'cancel_url': cancel_url,
+            'emi_option': 0,
+            'cus_name': customer_data['name'][:50],
+            'cus_email': customer_data['email'][:50],
+            'cus_phone': customer_data['phone'][:20],
+            'cus_add1': self._get_address_line(address),
+            'cus_city': 'Dhaka',
+            'cus_country': 'Bangladesh',
+            'shipping_method': 'YES' if order.shipping_address else 'NO',
+            'num_of_item': total_items,
+            'product_name': product_names[:100],
+            'product_category': 'E-commerce',
+            'product_profile': 'general',
+        }
+
+    def _get_base_url(self, request):
+        if getattr(settings, 'SITE_URL', None):
+            return settings.SITE_URL
+        protocol = 'https' if request.is_secure() else 'http'
+        return f"{protocol}://{request.get_host()}"
+
+    def _get_product_names(self, order):
+        items = order.items.all()
+        if not items:
+            return "Order Items"
+        names = [item.variant.product.name for item in items[:3]]
+        product_names = ', '.join(names)
+        if items.count() > 3:
+            product_names += f" & {items.count() - 3} more"
+        return product_names
+
+    def _get_total_items(self, order):
+        return sum(item.quantity for item in order.items.all())
+
+    def _get_address_line(self, address):
+        if not address:
+            return 'N/A'
+        return address.full_address or 'N/A'
+
+    def _get_sslcommerz_client(self):
         settings_dict = {
             'store_id': settings.SSLCOMMERZ_STORE_ID,
             'store_pass': settings.SSLCOMMERZ_STORE_PASSWORD,
             'issandbox': settings.SSLCOMMERZ_IS_SANDBOX,
         }
-        sslcz = SSLCOMMERZ(settings_dict)
+        return SSLCOMMERZ(settings_dict)
 
-        post_body = {
-            'total_amount': str(order.total_amount),
-            'currency': 'BDT',
-            'tran_id': order.order_number,
-            'success_url': f'http://127.0.0.1:8000/api/shop/payment/success/{order.id}/',
-            'fail_url': f'http://127.0.0.1:8000/api/shop/payment/fail/{order.id}/',
-            'cancel_url': f'http://127.0.0.1:8000/api/shop/payment/cancel/{order.id}/',
-            'emi_option': 0,
-            'cus_name': request.user.username,
-            'cus_email': request.user.email or 'test@example.com',
-            'cus_phone': '01700000000',
-            'cus_add1': 'Dhaka',
-            'cus_city': 'Dhaka',
-            'cus_country': 'Bangladesh',
-            'shipping_method': 'NO',
-            'num_of_item': order.items.count(),
-            'product_name': 'Order Items',
-            'product_category': 'Clothing',
-            'product_profile': 'general',
-        }
-
-        response = sslcz.createSession(post_body)
-
+    def _create_payment_record(self, order):
         Payment.objects.update_or_create(
             order=order,
-            defaults={'method': 'card', 'status': 'pending'}
+            defaults={
+                'method': 'card',
+                'status': 'pending',
+                'transaction_id': order.order_number
+            }
         )
-
-        return Response({'payment_url': response.get('GatewayPageURL')}, status=status.HTTP_200_OK)
 
 
 class PaymentSuccessView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, order_id):
-        order = get_object_or_404(Order, id=order_id)
-        order.status = 'confirmed'
-        order.save()
+        return self._handle(request, order_id)
 
-        payment = order.payment
-        payment.status = 'paid'
-        payment.transaction_id = request.data.get('tran_id', '')
-        payment.save()
+    def get(self, request, order_id):
+        return self._handle(request, order_id)
 
-        return Response({'message': 'Payment successful'}, status=status.HTTP_200_OK)
+    def _handle(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+            order.status = 'paid'
+            order.save()
+
+            payment = Payment.objects.filter(order=order).first()
+            if payment:
+                payment.status = 'completed'
+                payment.transaction_id = request.POST.get('tran_id') or request.GET.get('tran_id', payment.transaction_id)
+                payment.save()
+
+            if getattr(settings, 'FRONTEND_URL', None):
+                return redirect(f"{settings.FRONTEND_URL}/payment/success?order_id={order.id}")
+            return Response({'message': 'Payment successful', 'order_id': order.id})
+
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Payment success callback error: {str(e)}")
+            return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PaymentFailView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, order_id):
-        order = get_object_or_404(Order, id=order_id)
-        payment = order.payment
-        payment.status = 'failed'
-        payment.save()
+        return self._handle(request, order_id)
 
-        return Response({'message': 'Payment failed'}, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request, order_id):
+        return self._handle(request, order_id)
+
+    def _handle(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+            payment = Payment.objects.filter(order=order).first()
+            if payment:
+                payment.status = 'failed'
+                payment.save()
+
+            if getattr(settings, 'FRONTEND_URL', None):
+                return redirect(f"{settings.FRONTEND_URL}/payment/fail?order_id={order.id}")
+            return Response({'error': 'Payment failed', 'order_id': order.id})
+
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Payment fail callback error: {str(e)}")
+            return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PaymentCancelView(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, order_id):
+        return self._handle(request, order_id)
+
+    def get(self, request, order_id):
+        return self._handle(request, order_id)
+
+    def _handle(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+            payment = Payment.objects.filter(order=order).first()
+            if payment:
+                payment.status = 'cancelled'
+                payment.save()
+
+            if getattr(settings, 'FRONTEND_URL', None):
+                return redirect(f"{settings.FRONTEND_URL}/payment/cancel?order_id={order.id}")
+            return Response({'message': 'Payment cancelled', 'order_id': order.id})
+
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Payment cancel callback error: {str(e)}")
+            return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
