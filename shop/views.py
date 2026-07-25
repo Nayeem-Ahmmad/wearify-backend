@@ -8,6 +8,9 @@ from rest_framework import filters
 from .filters import ProductFilter
 from rest_framework.pagination import PageNumberPagination
 
+from sslcommerz_lib import SSLCOMMERZ
+from django.conf import settings
+
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
@@ -215,3 +218,76 @@ class WishlistViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+#--------------Payment getway--------------------------------------------------
+class InitiatePaymentView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id, user=request.user)
+
+        settings_dict = {
+            'store_id': settings.SSLCOMMERZ_STORE_ID,
+            'store_pass': settings.SSLCOMMERZ_STORE_PASSWORD,
+            'issandbox': settings.SSLCOMMERZ_IS_SANDBOX,
+        }
+        sslcz = SSLCOMMERZ(settings_dict)
+
+        post_body = {
+            'total_amount': str(order.total_amount),
+            'currency': 'BDT',
+            'tran_id': order.order_number,
+            'success_url': f'http://127.0.0.1:8000/api/shop/payment/success/{order.id}/',
+            'fail_url': f'http://127.0.0.1:8000/api/shop/payment/fail/{order.id}/',
+            'cancel_url': f'http://127.0.0.1:8000/api/shop/payment/cancel/{order.id}/',
+            'emi_option': 0,
+            'cus_name': request.user.username,
+            'cus_email': request.user.email or 'test@example.com',
+            'cus_phone': '01700000000',
+            'cus_add1': 'Dhaka',
+            'cus_city': 'Dhaka',
+            'cus_country': 'Bangladesh',
+            'shipping_method': 'NO',
+            'num_of_item': order.items.count(),
+            'product_name': 'Order Items',
+            'product_category': 'Clothing',
+            'product_profile': 'general',
+        }
+
+        response = sslcz.createSession(post_body)
+
+        Payment.objects.update_or_create(
+            order=order,
+            defaults={'method': 'card', 'status': 'pending'}
+        )
+
+        return Response({'payment_url': response.get('GatewayPageURL')}, status=status.HTTP_200_OK)
+
+
+class PaymentSuccessView(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id)
+        order.status = 'confirmed'
+        order.save()
+
+        payment = order.payment
+        payment.status = 'paid'
+        payment.transaction_id = request.data.get('tran_id', '')
+        payment.save()
+
+        return Response({'message': 'Payment successful'}, status=status.HTTP_200_OK)
+
+
+class PaymentFailView(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id)
+        payment = order.payment
+        payment.status = 'failed'
+        payment.save()
+
+        return Response({'message': 'Payment failed'}, status=status.HTTP_400_BAD_REQUEST)

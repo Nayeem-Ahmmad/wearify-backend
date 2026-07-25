@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
-    OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet
+    OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
+    PaymentFailView
 )
 
 router = DefaultRouter()
@@ -22,4 +23,7 @@ router.register('wishlist', WishlistViewSet, basename='wishlist')
 urlpatterns = [
     path('', include(router.urls)),
     path('register/', RegisterView.as_view(), name='register'),
+    path('payment/initiate/<int:order_id>/', InitiatePaymentView.as_view(), name='payment-initiate'),
+    path('payment/success/<int:order_id>/', PaymentSuccessView.as_view(), name='payment-success'),
+    path('payment/fail/<int:order_id>/', PaymentFailView.as_view(), name='payment-fail'),
 ]

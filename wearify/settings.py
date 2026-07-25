@@ -140,3 +140,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+SSLCOMMERZ_STORE_ID = 'weari6a64827f01b62'
+SSLCOMMERZ_STORE_PASSWORD = 'weari6a64827f01b62@ssl'
+SSLCOMMERZ_IS_SANDBOX = True
