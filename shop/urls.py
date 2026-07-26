@@ -27,5 +27,4 @@ urlpatterns = [
     path('payment/success/<int:order_id>/', PaymentSuccessView.as_view(), name='payment-success'),
     path('payment/fail/<int:order_id>/', PaymentFailView.as_view(), name='payment-fail'),
     path('payment/cancel/<int:order_id>/', PaymentCancelView.as_view(), name='payment-cancel'),
-
 ]

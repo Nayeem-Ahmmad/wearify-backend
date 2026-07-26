@@ -1,6 +1,8 @@
 
 from pathlib import Path
 from datetime import timedelta
+import os
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -144,3 +146,13 @@ STATIC_URL = 'static/'
 SSLCOMMERZ_STORE_ID = 'weari6a64827f01b62'
 SSLCOMMERZ_STORE_PASSWORD = 'weari6a64827f01b62@ssl'
 SSLCOMMERZ_IS_SANDBOX = True
+
+#----------------- Email send _______________________________________
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'wearify.sells@gmail.com'
+EMAIL_HOST_PASSWORD = 'arxlaihwphekqtdp'
+DEFAULT_FROM_EMAIL = 'Wearify <wearify.sells@gmail.com>'
