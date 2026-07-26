@@ -1,25 +1,13 @@
-
+import os
 from pathlib import Path
 from datetime import timedelta
-import os
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-)it*%ctmeqj&5x$yvt_g^t$ah@5*=g$727kp78=j5!cwkxm(c^'
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -36,6 +24,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework_simplejwt',
     'django_filters',
+    'drf_spectacular',
 
     # Local apps
     'shop',
@@ -55,7 +44,25 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    #Rate limiting/throttling 
+
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/minute',
+        'user': '100/minute',
+        'register': '5/hour',
+        'login': '5/minute',
+        'payment': '10/minute',
+    },
+
 }
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
@@ -96,19 +103,12 @@ TEMPLATES = [
 WSGI_APPLICATION = 'wearify.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -125,22 +125,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = 'static/'
 
 SSLCOMMERZ_STORE_ID = 'weari6a64827f01b62'
@@ -156,3 +144,10 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'wearify.sells@gmail.com'
 EMAIL_HOST_PASSWORD = 'arxlaihwphekqtdp'
 DEFAULT_FROM_EMAIL = 'Wearify <wearify.sells@gmail.com>'
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Wearify API',
+    'DESCRIPTION': 'E-commerce API for Wearify — clothing store built with Django REST Framework',
+    'VERSION': '1.0.0',
+}

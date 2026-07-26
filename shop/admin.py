@@ -1,4 +1,8 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.core.mail import send_mail
+from django.conf import settings
+
+
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
@@ -49,13 +53,40 @@ class OrderItemInline(admin.TabularInline):
     extra = 0
     readonly_fields = ['variant', 'quantity', 'price_at_purchase']
 
-
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['order_number', 'user', 'status', 'total_amount', 'created_at']
     list_filter = ['status', 'created_at']
     search_fields = ['order_number', 'user__username']
     inlines = [OrderItemInline]
+    actions = ['approve_orders']
+
+    def approve_orders(self, request, queryset):
+        approved_count = 0
+        for order in queryset:
+            if order.status == 'pending':
+                order.status = 'confirmed'
+                order.save()
+
+                send_mail(
+                    subject=f'✅ Your Order is Confirmed - {order.order_number}',
+                    message=(
+                        f'Hi {order.user.username},\n\n'
+                        f'Great news! Your order has been confirmed and is now being processed.\n\n'
+                        f'Order Number : {order.order_number}\n'
+                        f'Total Amount : {order.total_amount} BDT\n\n'
+                        f'We will notify you once your order is shipped.\n\n'
+                        f'Thank you for shopping with Wearify!'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[order.user.email],
+                    fail_silently=True,
+                )
+                approved_count += 1
+
+        self.message_user(request, f'{approved_count} order(s) approved and customer notified.', messages.SUCCESS)
+
+    approve_orders.short_description = "Approve selected orders & notify customer"
 
 
 @admin.register(Payment)

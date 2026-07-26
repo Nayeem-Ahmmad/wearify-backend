@@ -101,6 +101,22 @@ class Product(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
+    def get_related_products(self, limit=6):
+        related = Product.objects.filter(
+            category=self.category,
+            is_active=True
+        ).exclude(id=self.id)
+
+        if related.count() < limit and self.brand:
+            brand_related = Product.objects.filter(
+                brand=self.brand,
+                is_active=True
+            ).exclude(id=self.id).exclude(id__in=related.values_list('id', flat=True))
+            related = list(related) + list(brand_related)
+            return related[:limit]
+
+        return related[:limit]
+
     def __str__(self):
         return self.name
 

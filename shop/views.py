@@ -1,6 +1,8 @@
 from xml.dom import ValidationErr
 
 from rest_framework import viewsets, generics, status, permissions
+from rest_framework.views import APIView
+from django.utils.timezone import now
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404, redirect
 from rest_framework.response import Response
@@ -10,6 +12,8 @@ from rest_framework import filters
 from .filters import ProductFilter
 from django.urls import reverse
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.throttling import AnonRateThrottle
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,10 +33,13 @@ from .serializers import (
     WishlistSerializer
 )
 
+class RegisterThrottle(AnonRateThrottle):
+    scope = 'register'
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [RegisterThrottle]
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.filter(parent=None)
@@ -65,6 +72,13 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['base_price', 'created_at']
     pagination_class = ProductPagination
+
+    @action(detail=True, methods=['get'])
+    def related(self, request, slug=None):
+        product = self.get_object()
+        related_products = product.get_related_products()
+        serializer = ProductSerializer(related_products, many=True, context={'request': request})
+        return Response(serializer.data)
 
 class AddressViewSet(viewsets.ModelViewSet):
     serializer_class = AddressSerializer
@@ -227,8 +241,6 @@ class WishlistViewSet(viewsets.ModelViewSet):
 
 
 #--------------- Payment Getway -------------------------------------------------
-
-
 class InitiatePaymentView(generics.GenericAPIView):
 
     permission_classes = [permissions.IsAuthenticated]
@@ -256,14 +268,19 @@ class InitiatePaymentView(generics.GenericAPIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
-        if not response or 'GatewayPageURL' not in response:
+        logger.error(f"SSLCOMMERZ raw response: {response}")
+
+        if not response or response.get('status') != 'SUCCESS' or not response.get('GatewayPageURL'):
             logger.error(f"SSLCOMMERZ invalid response: {response}")
             return Response(
-                {"error": "Failed to initiate payment. Please try again."},
+                {
+                    "error": "Failed to initiate payment. Please try again.",
+                    "gateway_response": response
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        self._create_payment_record(order)
+        self._create_payment_record(order, request)
 
         return Response({
             'payment_url': response.get('GatewayPageURL'),
@@ -275,7 +292,7 @@ class InitiatePaymentView(generics.GenericAPIView):
         return get_object_or_404(Order, id=order_id, user=user)
 
     def _validate_order_payable(self, order):
-        if order.status in ['confirmed', 'paid', 'shipped', 'delivered']:
+        if order.status in ['paid', 'shipped', 'delivered']:
             return Response(
                 {"error": "This order has already been processed."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -283,6 +300,11 @@ class InitiatePaymentView(generics.GenericAPIView):
         if order.status == 'cancelled':
             return Response(
                 {"error": "This order has been cancelled."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if order.status == 'pending':
+            return Response(
+                {"error": "This order is not yet confirmed by admin. Please wait for approval."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if order.total_amount <= 0:
@@ -325,7 +347,7 @@ class InitiatePaymentView(generics.GenericAPIView):
         total_items = self._get_total_items(order)
         address = customer_data['address']
 
-        return {
+        payload = {
             'total_amount': str(order.total_amount),
             'currency': 'BDT',
             'tran_id': order.order_number,
@@ -345,6 +367,17 @@ class InitiatePaymentView(generics.GenericAPIView):
             'product_category': 'E-commerce',
             'product_profile': 'general',
         }
+
+        if order.shipping_address:
+            payload.update({
+                'ship_name': customer_data['name'][:50],
+                'ship_add1': self._get_address_line(address),
+                # 'ship_city': 'Dhaka',
+                # 'ship_postcode': '1000',
+                'ship_country': 'Bangladesh',
+            })
+
+        return payload
 
     def _get_base_url(self, request):
         if getattr(settings, 'SITE_URL', None):
@@ -378,18 +411,19 @@ class InitiatePaymentView(generics.GenericAPIView):
         }
         return SSLCOMMERZ(settings_dict)
 
-    def _create_payment_record(self, order):
+    def _create_payment_record(self, order, request):
+        method = request.data.get('payment_method', 'card')
         Payment.objects.update_or_create(
             order=order,
             defaults={
-                'method': 'card',
+                'method': method,
                 'status': 'pending',
                 'transaction_id': order.order_number
             }
         )
 
 
-class PaymentSuccessView(generics.GenericAPIView):
+class PaymentSuccessView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, order_id):
@@ -399,6 +433,7 @@ class PaymentSuccessView(generics.GenericAPIView):
         return self._handle(request, order_id)
 
     def _handle(self, request, order_id):
+        from django.utils.timezone import now
         try:
             order = Order.objects.get(id=order_id)
             order.status = 'paid'
@@ -406,8 +441,11 @@ class PaymentSuccessView(generics.GenericAPIView):
 
             payment = Payment.objects.filter(order=order).first()
             if payment:
-                payment.status = 'completed'
+                card_type = (request.POST.get('card_type') or request.GET.get('card_type', '')).lower()
+                payment.method = self._map_method(card_type)
+                payment.status = 'paid'
                 payment.transaction_id = request.POST.get('tran_id') or request.GET.get('tran_id', payment.transaction_id)
+                payment.paid_at = now()
                 payment.save()
 
             if getattr(settings, 'FRONTEND_URL', None):
@@ -420,8 +458,16 @@ class PaymentSuccessView(generics.GenericAPIView):
             logger.error(f"Payment success callback error: {str(e)}")
             return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
 
+    def _map_method(self, card_type):
+        if 'bkash' in card_type:
+            return 'bkash'
+        if 'nagad' in card_type:
+            return 'nagad'
+        if 'cod' in card_type:
+            return 'cod'
+        return 'card'
 
-class PaymentFailView(generics.GenericAPIView):
+class PaymentFailView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, order_id):
@@ -449,7 +495,7 @@ class PaymentFailView(generics.GenericAPIView):
             return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class PaymentCancelView(generics.GenericAPIView):
+class PaymentCancelView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, order_id):
