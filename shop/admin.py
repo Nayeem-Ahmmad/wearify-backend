@@ -8,6 +8,7 @@ from .models import (
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
     Order, OrderItem, Payment, Review, Wishlist
 )
+from .tasks import send_order_confirmation_email_task
 
 
 class ProductImageInline(admin.TabularInline):
@@ -67,21 +68,7 @@ class OrderAdmin(admin.ModelAdmin):
             if order.status == 'pending':
                 order.status = 'confirmed'
                 order.save()
-
-                send_mail(
-                    subject=f'✅ Your Order is Confirmed - {order.order_number}',
-                    message=(
-                        f'Hi {order.user.username},\n\n'
-                        f'Great news! Your order has been confirmed and is now being processed.\n\n'
-                        f'Order Number : {order.order_number}\n'
-                        f'Total Amount : {order.total_amount} BDT\n\n'
-                        f'We will notify you once your order is shipped.\n\n'
-                        f'Thank you for shopping with Wearify!'
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[order.user.email],
-                    fail_silently=True,
-                )
+                send_order_confirmation_email_task.delay(order.id)
                 approved_count += 1
 
         self.message_user(request, f'{approved_count} order(s) approved and customer notified.', messages.SUCCESS)

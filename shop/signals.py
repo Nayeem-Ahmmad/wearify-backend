@@ -44,20 +44,3 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
             recipient_list=[settings.EMAIL_HOST_USER],
             fail_silently=True,
         )
-
-
-@receiver(post_save, sender=Payment)
-def send_payment_status_email(sender, instance, created, **kwargs):
-    if not created and instance.status in ['paid', 'completed']:
-        send_mail(
-            subject=f'Payment Successful - {instance.order.order_number}',
-            message=(
-                f'Hi {instance.order.user.username},\n\n'
-                f'Your payment for order {instance.order.order_number} has been received successfully.\n'
-                f'Amount: {instance.order.total_amount} BDT\n\n'
-                f'Thank you for shopping with Wearify!'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[instance.order.user.email],
-            fail_silently=False,
-        )

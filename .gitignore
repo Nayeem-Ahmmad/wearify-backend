@@ -101,3 +101,6 @@ node_modules/
 npm-debug.log
 package-lock.json
 yarn.lock
+
+#loggine monitoring
+logs/*.log

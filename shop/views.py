@@ -13,6 +13,7 @@ from .filters import ProductFilter
 from django.urls import reverse
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
+from .tasks import send_payment_success_email_task
 
 
 import logging
@@ -156,10 +157,12 @@ class OrderViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         cart, _ = Cart.objects.get_or_create(user=request.user)
         if not cart.items.exists():
+            logger.warning(f"Order creation failed - empty cart for user {request.user.username}")
             return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
         for item in cart.items.all():
             if item.variant.stock_quantity < item.quantity:
+                logger.warning(f"Order creation failed - insufficient stock for {item.variant} (user: {request.user.username})")
                 return Response(
                     {"error": f"Insufficient stock for {item.variant}"},
                     status=status.HTTP_400_BAD_REQUEST
@@ -184,6 +187,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         cart.items.all().delete()
+        logger.info(f"Order {order.order_number} created successfully by {request.user.username}")
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -448,14 +452,18 @@ class PaymentSuccessView(APIView):
                 payment.paid_at = now()
                 payment.save()
 
+            send_payment_success_email_task.delay(order.id)
+            logger.info(f"Payment successful for order {order.order_number}")
+
             if getattr(settings, 'FRONTEND_URL', None):
                 return redirect(f"{settings.FRONTEND_URL}/payment/success?order_id={order.id}")
             return Response({'message': 'Payment successful', 'order_id': order.id})
 
         except Order.DoesNotExist:
+            logger.error(f"Payment success callback failed - order {order_id} not found")
             return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Payment success callback error: {str(e)}")
+            logger.error(f"Payment success callback error for order {order_id}: {str(e)}")
             return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
 
     def _map_method(self, card_type):
