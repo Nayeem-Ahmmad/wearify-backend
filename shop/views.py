@@ -108,13 +108,13 @@ class CartViewSet(viewsets.ViewSet):
 
     def list(self, request):
         cart, _ = Cart.objects.get_or_create(user=request.user)
-        serializer = CartSerializer(cart)
+        serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def add_item(self, request):
         cart, _ = Cart.objects.get_or_create(user=request.user)
-        serializer = CartItemSerializer(data=request.data)
+        serializer = CartItemSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         variant = serializer.validated_data['variant']
         quantity = serializer.validated_data.get('quantity', 1)
@@ -126,7 +126,7 @@ class CartViewSet(viewsets.ViewSet):
             item.quantity = quantity
         item.save()
 
-        return Response(CartSerializer(cart).data, status=status.HTTP_201_CREATED)
+        return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'])
     def remove_item(self, request):
@@ -134,7 +134,7 @@ class CartViewSet(viewsets.ViewSet):
         item_id = request.data.get('item_id')
         item = get_object_or_404(CartItem, id=item_id, cart=cart)
         item.delete()
-        return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
+        return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
     def update_item(self, request):
@@ -144,7 +144,7 @@ class CartViewSet(viewsets.ViewSet):
         item = get_object_or_404(CartItem, id=item_id, cart=cart)
         item.quantity = quantity
         item.save()
-        return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
+        return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_200_OK)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
