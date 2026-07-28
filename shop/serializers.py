@@ -65,10 +65,29 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class ProductVariantSerializer(serializers.ModelSerializer):
     price = serializers.ReadOnlyField()
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_slug = serializers.CharField(source='product.slug', read_only=True)
+    product_brand = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariant
-        fields = ['id', 'product', 'size', 'color', 'sku', 'price_override', 'stock_quantity', 'price']
+        fields = [
+            'id', 'product', 'product_name', 'product_slug', 'product_brand',
+            'product_image', 'size', 'color', 'sku', 'price_override',
+            'stock_quantity', 'price'
+        ]
+
+    def get_product_brand(self, obj):
+        return obj.product.brand.name if obj.product.brand else None
+
+    def get_product_image(self, obj):
+        first_image = obj.product.images.first()
+        if not first_image:
+            return None
+        request = self.context.get('request')
+        url = first_image.image.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class ProductSerializer(serializers.ModelSerializer):
