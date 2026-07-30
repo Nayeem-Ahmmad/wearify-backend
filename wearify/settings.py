@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+# settings.py
+
+FRONTEND_URL = "http://localhost:5173"
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 

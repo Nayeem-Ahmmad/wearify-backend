@@ -63,6 +63,7 @@ class ProductPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 50
+    
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductSerializer
@@ -101,7 +102,6 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-
 
 class CartViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -202,8 +202,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         order = self.get_object()
-        if order.status in ['delivered', 'shipped']:
-            return Response({"error": "Cannot cancel this order"}, status=status.HTTP_400_BAD_REQUEST)
+        if order.status != 'pending':
+            return Response({"error": "This order can no longer be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = 'cancelled'
         order.save()
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
@@ -306,11 +306,6 @@ class InitiatePaymentView(generics.GenericAPIView):
                 {"error": "This order has been cancelled."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if order.status == 'pending':
-            return Response(
-                {"error": "This order is not yet confirmed by admin. Please wait for approval."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         if order.total_amount <= 0:
             return Response(
                 {"error": "Invalid order amount."},
@@ -376,8 +371,8 @@ class InitiatePaymentView(generics.GenericAPIView):
             payload.update({
                 'ship_name': customer_data['name'][:50],
                 'ship_add1': self._get_address_line(address),
-                # 'ship_city': 'Dhaka',
-                # 'ship_postcode': '1000',
+                'ship_city': 'Dhaka',
+                'ship_postcode': '1000',
                 'ship_country': 'Bangladesh',
             })
 
