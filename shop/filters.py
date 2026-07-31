@@ -5,8 +5,8 @@ class ProductFilter(django_filters.FilterSet):
     max_price = django_filters.NumberFilter(field_name='base_price', lookup_expr='lte')
     
     category = django_filters.CharFilter(
-        field_name='category__name',
-        lookup_expr='icontains'   
+        field_name='category__slug',
+        lookup_expr='exact'
     )
     
     brand = django_filters.CharFilter(
