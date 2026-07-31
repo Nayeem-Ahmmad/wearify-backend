@@ -20,7 +20,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+class SimpleUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
+
+
+class UserAccountUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'email']
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
+    user = SimpleUserSerializer(read_only=True)
+
     class Meta:
         model = UserProfile
         fields = ['id', 'user', 'phone', 'profile_image']
@@ -36,13 +50,17 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'image', 'parent', 'children']
+        fields = ['id', 'name', 'slug', 'parent', 'children', 'image', 'product_count']
 
     def get_children(self, obj):
         return CategorySerializer(obj.children.all(), many=True).data
+
+    def get_product_count(self, obj):
+        return obj.products.filter(is_active=True).count()
 
 
 class BrandSerializer(serializers.ModelSerializer):

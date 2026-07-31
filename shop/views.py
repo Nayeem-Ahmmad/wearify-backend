@@ -20,6 +20,9 @@ import logging
 logger = logging.getLogger(__name__)
 from sslcommerz_lib import SSLCOMMERZ, sslcommerz
 from django.conf import settings
+from rest_framework import generics
+
+from django.db.models import F
 
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
@@ -31,7 +34,7 @@ from .serializers import (
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer
+    WishlistSerializer, UserAccountUpdateSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -42,6 +45,13 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
     throttle_classes = [RegisterThrottle]
 
+class UpdateAccountView(generics.UpdateAPIView):
+    serializer_class = UserAccountUpdateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+    
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.filter(parent=None)
     serializer_class = CategorySerializer
@@ -80,6 +90,22 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         related_products = product.get_related_products()
         serializer = ProductSerializer(related_products, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def deals(self, request):
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(
+                variants__price_override__isnull=False,
+                variants__price_override__lt=F('base_price'),
+                is_active=True,
+            ).distinct()
+        )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
 class AddressViewSet(viewsets.ModelViewSet):
