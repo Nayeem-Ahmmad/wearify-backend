@@ -44,3 +44,4 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
             recipient_list=[settings.EMAIL_HOST_USER],
             fail_silently=True,
         )
+

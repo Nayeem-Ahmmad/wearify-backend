@@ -6,7 +6,7 @@ from django.conf import settings
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale
 )
 from .tasks import send_order_confirmation_email_task
 
@@ -19,6 +19,7 @@ class ProductImageInline(admin.TabularInline):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 1
+    fields = ['size', 'color', 'sku', 'price_override', 'stock_quantity']
 
 
 @admin.register(Product)
@@ -87,6 +88,11 @@ class PaymentAdmin(admin.ModelAdmin):
 class CouponAdmin(admin.ModelAdmin):
     list_display = ['coupon_code', 'discount_percent', 'valid_from', 'valid_to', 'usage_limit']
     search_fields = ['coupon_code']
+
+@admin.register(FlashSale)
+class FlashSaleAdmin(admin.ModelAdmin):
+    list_display = ['title', 'start_time', 'end_time', 'is_active']
+    list_filter = ['is_active']
 
 
 @admin.register(Review)

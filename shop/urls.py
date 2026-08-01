@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView, PaymentCancelView, UpdateAccountView
+    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView
 )
 
 router = DefaultRouter()
@@ -23,6 +23,8 @@ router.register('wishlist', WishlistViewSet, basename='wishlist')
 urlpatterns = [
     path('', include(router.urls)),
     path('register/', RegisterView.as_view(), name='register'),
+    path('contact/', ContactMessageView.as_view(), name='contact'),
+    path('flash-sale/active/', ActiveFlashSaleView.as_view(), name='active-flash-sale'),
     path('update-account/', UpdateAccountView.as_view(), name='update-account'),
     path('payment/initiate/<int:order_id>/', InitiatePaymentView.as_view(), name='payment-initiate'),
     path('payment/success/<int:order_id>/', PaymentSuccessView.as_view(), name='payment-success'),

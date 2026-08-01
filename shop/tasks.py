@@ -80,3 +80,24 @@ def send_payment_success_email_task(order_id):
         logger.info(f"Payment success email sent for order {order.order_number}")
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for payment email task")
+
+
+
+
+@shared_task
+def send_contact_message_task(name, email, message):
+    try:
+        send_mail(
+            subject=f'New Contact Message from {name}',
+            message=(
+                f'Name: {name}\n'
+                f'Email: {email}\n\n'
+                f'Message:\n{message}'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.EMAIL_HOST_USER],
+            fail_silently=False,
+        )
+        logger.info(f"Contact message email sent successfully from {email}")
+    except Exception as e:
+        logger.error(f"Failed to send contact message email from {email}: {e}")

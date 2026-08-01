@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale
 )
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -11,6 +11,12 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password']
+
+
+class ContactMessageSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)
+    email = serializers.EmailField()
+    message = serializers.CharField()
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -105,7 +111,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get('request')
         url = first_image.image.url
-        return request.build_absolute_uri(url) if request else url
+        return request.build_absolute_uri(url) if request else url  
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -123,11 +129,13 @@ class ProductSerializer(serializers.ModelSerializer):
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(), source='tags', many=True, write_only=True, required=False
     )
+    is_on_sale = serializers.ReadOnlyField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'description', 'base_price',
+            'discount_percent', 'discount_start', 'discount_end', 'is_on_sale',
             'category', 'category_id', 'brand', 'brand_id',
             'tags', 'tag_ids', 'images', 'variants',
             'is_active', 'created_at'
@@ -220,3 +228,8 @@ class WishlistSerializer(serializers.ModelSerializer):
         model = Wishlist
         fields = ['id', 'user', 'product', 'product_id']
         read_only_fields = ['user']
+
+class FlashSaleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FlashSale
+        fields = ['id', 'title', 'start_time', 'end_time', 'is_active']

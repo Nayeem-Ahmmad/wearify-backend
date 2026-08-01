@@ -13,13 +13,14 @@ from .filters import ProductFilter
 from django.urls import reverse
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
-from .tasks import send_payment_success_email_task
+from .tasks import send_payment_success_email_task, send_contact_message_task
 
 
 import logging
 logger = logging.getLogger(__name__)
 from sslcommerz_lib import SSLCOMMERZ, sslcommerz
 from django.conf import settings
+from django.core.mail import send_mail
 from rest_framework import generics
 
 from django.db.models import F
@@ -27,18 +28,35 @@ from django.db.models import F
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
-    Review, Wishlist
+    Review, Wishlist, FlashSale
 )
 from .serializers import (
     RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
     scope = 'register'
+
+
+class ContactMessageView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ContactMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        send_contact_message_task.delay(data['name'], data['email'], data['message'])
+        return Response(
+            {"success": "Your message has been received. We'll get back to you soon!"},
+            status=status.HTTP_200_OK
+        )
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -567,3 +585,20 @@ class PaymentCancelView(APIView):
         except Exception as e:
             logger.error(f"Payment cancel callback error: {str(e)}")
             return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActiveFlashSaleView(generics.RetrieveAPIView):
+    serializer_class = FlashSaleSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        from django.utils.timezone import now
+        flash_sale = FlashSale.objects.filter(
+            is_active=True,
+            start_time__lte=now(),
+            end_time__gte=now()
+        ).first()
+        if not flash_sale:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("No active flash sale")
+        return flash_sale

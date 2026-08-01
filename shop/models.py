@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.utils.timezone import now
+from django.utils import timezone
 
 # --------------------------- User Side ----------------------------------------------------------------------
 
@@ -76,6 +77,9 @@ class Product(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_start = models.DateTimeField(null=True, blank=True)
+    discount_end = models.DateTimeField(null=True, blank=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -96,6 +100,17 @@ class Product(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_on_sale(self):
+        if not self.discount_percent:
+            return False
+        now = timezone.now()
+        if self.discount_start and now < self.discount_start:
+            return False
+        if self.discount_end and now > self.discount_end:
+            return False
+        return True
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -157,7 +172,7 @@ class ProductVariant(models.Model):
 
     @property
     def price(self):
-        return self.price_override if self.price_override else self.product.base_price
+        return self.price_override if self.price_override is not None else self.product.base_price
 
     def __str__(self):
         return f"{self.product.name} - {self.size}/{self.color}"
@@ -358,3 +373,12 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.product.name}"
+
+class FlashSale(models.Model):
+    title = models.CharField(max_length=100, default='Flash Sale')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_time.date()} - {self.end_time.date()})"
