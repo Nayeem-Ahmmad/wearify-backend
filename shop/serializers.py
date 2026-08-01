@@ -197,10 +197,10 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'user', 'order_number', 'coupon', 'status',
-            'shipping_address', 'shipping_address_id',
+            'shipping_address', 'shipping_address_id', 'shipping_cost',
             'total_amount', 'created_at', 'items', 'payment'
         ]
-        read_only_fields = ['user', 'order_number', 'total_amount']
+        read_only_fields = ['user', 'order_number', 'total_amount', 'shipping_cost']
 
 
 class ReviewSerializer(serializers.ModelSerializer):

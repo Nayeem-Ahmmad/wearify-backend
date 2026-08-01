@@ -182,11 +182,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         cart, _ = Cart.objects.get_or_create(user=request.user)
-        if not cart.items.exists():
-            logger.warning(f"Order creation failed - empty cart for user {request.user.username}")
+        item_ids = request.data.get('item_ids')
+
+        if item_ids:
+            items_qs = cart.items.filter(id__in=item_ids)
+        else:
+            items_qs = cart.items.all()
+
+        if not items_qs.exists():
+            logger.warning(f"Order creation failed - no items selected for user {request.user.username}")
             return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
-        for item in cart.items.all():
+        for item in items_qs:
             if item.variant.stock_quantity < item.quantity:
                 logger.warning(f"Order creation failed - insufficient stock for {item.variant} (user: {request.user.username})")
                 return Response(
@@ -194,17 +201,27 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+        delivery_location = request.data.get('delivery_location', 'inside_dhaka')
+        items_total = sum(item.variant.price * item.quantity for item in items_qs)
+
+        if items_total > 2500:
+            shipping_cost = 0
+        else:
+            shipping_cost = 60 if delivery_location == 'inside_dhaka' else 130
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        total_amount = sum(item.variant.price * item.quantity for item in cart.items.all())
+        total_amount = items_total + shipping_cost
+
         order = serializer.save(
             user=request.user,
             order_number=f"ORD-{Order.objects.count() + 1:06d}",
-            total_amount=total_amount
+            total_amount=total_amount,
+            shipping_cost=shipping_cost
         )
 
-        for item in cart.items.all():
+        for item in items_qs:
             OrderItem.objects.create(
                 order=order,
                 variant=item.variant,
@@ -212,7 +229,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 price_at_purchase=item.variant.price
             )
 
-        cart.items.all().delete()
+        items_qs.delete()
         logger.info(f"Order {order.order_number} created successfully by {request.user.username}")
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
