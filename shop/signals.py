@@ -1,9 +1,10 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.conf import settings
 from .models import UserProfile, OrderItem, Order, Payment
+from .tasks import send_order_confirmation_email_task
 
 
 @receiver(post_save, sender=User)
@@ -45,3 +46,22 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
             fail_silently=True,
         )
 
+
+@receiver(pre_save, sender=Order)
+def capture_previous_order_status(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            instance._previous_status = Order.objects.get(pk=instance.pk).status
+        except Order.DoesNotExist:
+            instance._previous_status = None
+    else:
+        instance._previous_status = None
+
+
+@receiver(post_save, sender=Order)
+def send_confirmation_email_on_status_change(sender, instance, created, **kwargs):
+    if created:
+        return
+    previous_status = getattr(instance, '_previous_status', None)
+    if previous_status != 'confirmed' and instance.status == 'confirmed':
+        send_order_confirmation_email_task.delay(instance.id)
