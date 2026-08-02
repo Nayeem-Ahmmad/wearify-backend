@@ -77,9 +77,6 @@ class Product(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
-    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    discount_start = models.DateTimeField(null=True, blank=True)
-    discount_end = models.DateTimeField(null=True, blank=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -101,21 +98,14 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def is_on_sale(self):
-        if not self.discount_percent:
-            return False
-        now = timezone.now()
-        if self.discount_start and now < self.discount_start:
-            return False
-        if self.discount_end and now > self.discount_end:
-            return False
-        return True
-
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
+    def get_active_flash_sale(self):
+        now = timezone.now()
+        return self.flash_sales.filter(start_time__lte=now, end_time__gte=now).first()
 
     def get_related_products(self, limit=6):
         related = Product.objects.filter(
@@ -171,8 +161,24 @@ class ProductVariant(models.Model):
     stock_quantity = models.PositiveIntegerField(default=0)
 
     @property
+    def original_price(self):
+        return self.product.base_price
+
+    @property
     def price(self):
-        return self.price_override if self.price_override is not None else self.product.base_price
+        flash_sale = self.product.get_active_flash_sale()
+        if flash_sale:
+            return round(self.product.base_price * (1 - flash_sale.discount_percent / 100), 2)
+        if self.price_override is not None:
+            return self.price_override
+        return self.product.base_price
+
+    @property
+    def is_on_sale(self):
+        flash_sale = self.product.get_active_flash_sale()
+        if flash_sale:
+            return True
+        return self.price_override is not None and self.price_override < self.product.base_price
 
     def __str__(self):
         return f"{self.product.name} - {self.size}/{self.color}"
@@ -376,9 +382,14 @@ class Wishlist(models.Model):
 
 class FlashSale(models.Model):
     title = models.CharField(max_length=100, default='Flash Sale')
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    is_active = models.BooleanField(default=True)
+    products = models.ManyToManyField(Product, related_name='flash_sales', blank=True)
+
+    def is_active(self):
+        now = timezone.now()
+        return self.start_time <= now <= self.end_time
 
     def __str__(self):
-        return f"{self.title} ({self.start_time.date()} - {self.end_time.date()})"
+        return f"{self.title} (-{self.discount_percent}%)"

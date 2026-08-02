@@ -24,8 +24,13 @@ class ProductFilter(django_filters.FilterSet):
     on_sale = django_filters.BooleanFilter(method='filter_on_sale')
 
     def filter_on_sale(self, queryset, name, value):
+        from django.utils import timezone
+        from django.db.models import Q, F
+        now = timezone.now()
         if value:
-            return queryset.filter(variants__price_override__isnull=False)
+            flash_sale_q = Q(flash_sales__start_time__lte=now, flash_sales__end_time__gte=now)
+            override_q = Q(variants__price_override__isnull=False, variants__price_override__lt=F('base_price'))
+            return queryset.filter(flash_sale_q | override_q).distinct()
         return queryset
 
     class Meta:

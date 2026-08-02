@@ -1,5 +1,6 @@
 from xml.dom import ValidationErr
 
+from django.utils import timezone
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.views import APIView
 from django.utils.timezone import now
@@ -14,6 +15,7 @@ from django.urls import reverse
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 from .tasks import send_payment_success_email_task, send_contact_message_task
+from rest_framework.exceptions import NotFound
 
 
 import logging
@@ -35,11 +37,26 @@ from .serializers import (
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
     scope = 'register'
+
+
+class ActiveFlashSaleView(generics.RetrieveAPIView):
+    serializer_class = FlashSaleDetailSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        now = timezone.now()
+        flash_sale = FlashSale.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now
+        ).prefetch_related('products').first()
+        if not flash_sale:
+            raise NotFound("No active flash sale")
+        return flash_sale
 
 
 class ContactMessageView(APIView):
@@ -112,12 +129,13 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def deals(self, request):
+        from django.utils import timezone
+        from django.db.models import Q, F
+        now = timezone.now()
+        flash_sale_q = Q(flash_sales__start_time__lte=now, flash_sales__end_time__gte=now)
+        override_q = Q(variants__price_override__isnull=False, variants__price_override__lt=F('base_price'))
         queryset = self.filter_queryset(
-            self.get_queryset().filter(
-                variants__price_override__isnull=False,
-                variants__price_override__lt=F('base_price'),
-                is_active=True,
-            ).distinct()
+            self.get_queryset().filter(is_active=True).filter(flash_sale_q | override_q).distinct()
         )
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -588,17 +606,15 @@ class PaymentCancelView(APIView):
 
 
 class ActiveFlashSaleView(generics.RetrieveAPIView):
-    serializer_class = FlashSaleSerializer
+    serializer_class = FlashSaleDetailSerializer
     permission_classes = [permissions.AllowAny]
 
     def get_object(self):
-        from django.utils.timezone import now
+        now = timezone.now()
         flash_sale = FlashSale.objects.filter(
-            is_active=True,
-            start_time__lte=now(),
-            end_time__gte=now()
-        ).first()
+            start_time__lte=now,
+            end_time__gte=now
+        ).prefetch_related('products').first()
         if not flash_sale:
-            from rest_framework.exceptions import NotFound
             raise NotFound("No active flash sale")
         return flash_sale

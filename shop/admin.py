@@ -91,8 +91,8 @@ class CouponAdmin(admin.ModelAdmin):
 
 @admin.register(FlashSale)
 class FlashSaleAdmin(admin.ModelAdmin):
-    list_display = ['title', 'start_time', 'end_time', 'is_active']
-    list_filter = ['is_active']
+    list_display = ['title', 'discount_percent', 'start_time', 'end_time']
+    filter_horizontal = ['products']
 
 
 @admin.register(Review)

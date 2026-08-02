@@ -89,6 +89,8 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class ProductVariantSerializer(serializers.ModelSerializer):
     price = serializers.ReadOnlyField()
+    original_price = serializers.ReadOnlyField()
+    is_on_sale = serializers.ReadOnlyField()
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_slug = serializers.CharField(source='product.slug', read_only=True)
     product_brand = serializers.SerializerMethodField()
@@ -99,7 +101,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'product', 'product_name', 'product_slug', 'product_brand',
             'product_image', 'size', 'color', 'sku', 'price_override',
-            'stock_quantity', 'price'
+            'original_price', 'is_on_sale', 'stock_quantity', 'price'
         ]
 
     def get_product_brand(self, obj):
@@ -111,7 +113,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get('request')
         url = first_image.image.url
-        return request.build_absolute_uri(url) if request else url  
+        return request.build_absolute_uri(url) if request else url 
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -129,17 +131,21 @@ class ProductSerializer(serializers.ModelSerializer):
     tag_ids = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(), source='tags', many=True, write_only=True, required=False
     )
-    is_on_sale = serializers.ReadOnlyField()
+    flash_sale_end = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'description', 'base_price',
-            'discount_percent', 'discount_start', 'discount_end', 'is_on_sale',
+            'flash_sale_end',
             'category', 'category_id', 'brand', 'brand_id',
             'tags', 'tag_ids', 'images', 'variants',
             'is_active', 'created_at'
         ]
+
+    def get_flash_sale_end(self, obj):
+        flash_sale = obj.get_active_flash_sale()
+        return flash_sale.end_time if flash_sale else None
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -232,4 +238,11 @@ class WishlistSerializer(serializers.ModelSerializer):
 class FlashSaleSerializer(serializers.ModelSerializer):
     class Meta:
         model = FlashSale
-        fields = ['id', 'title', 'start_time', 'end_time', 'is_active']
+        fields = ['id', 'title', 'discount_percent', 'start_time', 'end_time', 'products']
+
+class FlashSaleDetailSerializer(serializers.ModelSerializer):
+    products = ProductSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = FlashSale
+        fields = ['id', 'title', 'discount_percent', 'start_time', 'end_time', 'products']
