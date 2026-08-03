@@ -15,6 +15,12 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.import_export",
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -32,6 +38,84 @@ INSTALLED_APPS = [
     # Local apps
     'shop',
 ]
+
+UNFOLD = {
+    "SITE_TITLE": "Wearify Admin",
+    "SITE_HEADER": "Wearify",
+    "SITE_SYMBOL": "storefront",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "DASHBOARD_CALLBACK": "shop.dashboard.dashboard_callback",
+    "COLORS": {
+        "primary": {
+            "50": "239 246 255",
+            "100": "219 234 254",
+            "200": "191 219 254",
+            "300": "147 197 253",
+            "400": "96 165 250",
+            "500": "37 99 235",
+            "600": "37 99 235",
+            "700": "29 78 216",
+            "800": "30 64 175",
+            "900": "30 58 138",
+            "950": "23 37 84",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {
+                "title": "Dashboard",
+                "items": [
+                    {
+                        "title": "Home",
+                        "icon": "dashboard",
+                        "link": "/admin/",
+                    },
+                ],
+            },
+            {
+                "title": "Catalog",
+                "collapsible": True,
+                "items": [
+                    {"title": "Products", "icon": "checkroom", "link": "/admin/shop/product/"},
+                    {"title": "Categories", "icon": "category", "link": "/admin/shop/category/"},
+                    {"title": "Brands", "icon": "sell", "link": "/admin/shop/brand/"},
+                    {"title": "Tags", "icon": "label", "link": "/admin/shop/tag/"},
+                ],
+            },
+            {
+                "title": "Sales",
+                "collapsible": True,
+                "items": [
+                    {"title": "Orders", "icon": "shopping_bag", "link": "/admin/shop/order/"},
+                    {"title": "Payments", "icon": "payments", "link": "/admin/shop/payment/"},
+                    {"title": "Carts", "icon": "shopping_cart", "link": "/admin/shop/cart/"},
+                ],
+            },
+            {
+                "title": "Promotions",
+                "collapsible": True,
+                "items": [
+                    {"title": "Coupons", "icon": "confirmation_number", "link": "/admin/shop/coupon/"},
+                    {"title": "Flash Sales", "icon": "bolt", "link": "/admin/shop/flashsale/"},
+                ],
+            },
+            {
+                "title": "Customers",
+                "collapsible": True,
+                "items": [
+                    {"title": "Users", "icon": "person", "link": "/admin/auth/user/"},
+                    {"title": "Profiles", "icon": "badge", "link": "/admin/shop/userprofile/"},
+                    {"title": "Addresses", "icon": "location_on", "link": "/admin/shop/address/"},
+                    {"title": "Reviews", "icon": "star", "link": "/admin/shop/review/"},
+                    {"title": "Wishlists", "icon": "favorite", "link": "/admin/shop/wishlist/"},
+                ],
+            },
+        ],
+    },
+}                                                                                                                                   
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -76,6 +160,9 @@ SIMPLE_JWT = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -92,7 +179,7 @@ ROOT_URLCONF = 'wearify.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

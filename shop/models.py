@@ -266,6 +266,7 @@ class Order(models.Model):
         blank=True,
         null=True
     )
+    coupon_discount = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
     shipping_address = models.ForeignKey(
         Address,
@@ -285,6 +286,7 @@ class Order(models.Model):
 
             discount = coupon.apply_discount(self.total_amount)
             self.coupon = coupon
+            self.coupon_discount = discount
             self.total_amount -= discount
             self.save()
 

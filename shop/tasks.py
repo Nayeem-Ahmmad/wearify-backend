@@ -21,17 +21,44 @@ def send_order_confirmation_email_task(order_id):
         for item in order.items.all():
             items_rows += f"""
                 <tr>
-                    <td style="padding:12px 0;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:14px;">
+                    <td style="padding:12px 0;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:15px;">
                         {item.variant.product.name}<br>
-                        <span style="color:#94a3b8;font-size:12px;">
+                        <span style="color:#94a3b8;font-size:13px;">
                             {item.variant.size}/{item.variant.color} &times; {item.quantity}
                         </span>
                     </td>
-                    <td style="padding:12px 0;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:14px;text-align:right;vertical-align:top;white-space:nowrap;">
+                    <td style="padding:12px 0;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:15px;text-align:right;vertical-align:top;white-space:nowrap;">
                         {item.price_at_purchase * item.quantity} BDT
                     </td>
                 </tr>
             """
+
+        coupon_row = ""
+        if order.coupon:
+            coupon_row = f"""
+                <tr>
+                    <td style="padding:0 0 12px;color:#16a34a;font-size:14px;">Coupon used — get {int(order.coupon.discount_percent)}% discount</td>
+                    <td style="padding:0 0 12px;color:#16a34a;font-size:14px;text-align:right;white-space:nowrap;">-{order.coupon_discount} BDT</td>
+                </tr>
+            """
+
+        items_rows += f"""
+            <tr>
+                <td style="padding:12px 0 4px;color:#64748b;font-size:14px;">Subtotal</td>
+                <td style="padding:12px 0 4px;color:#0f172a;font-size:14px;text-align:right;white-space:nowrap;">{order.total_amount + order.coupon_discount - order.shipping_cost} BDT</td>
+            </tr>
+            <tr>
+                <td style="padding:0 0 12px;color:#64748b;font-size:14px;">Shipping</td>
+                <td style="padding:0 0 12px;color:#0f172a;font-size:14px;text-align:right;white-space:nowrap;">
+                    {'FREE' if order.shipping_cost == 0 else f'{order.shipping_cost} BDT'}
+                </td>
+            </tr>
+            {coupon_row}
+            <tr>
+                <td style="padding:14px 0;border-top:2px solid #e2e8f0;font-weight:700;color:#0f172a;font-size:17px;">Total</td>
+                <td style="padding:14px 0;border-top:2px solid #e2e8f0;font-weight:700;color:#2563EB;font-size:17px;text-align:right;white-space:nowrap;">{order.total_amount} BDT</td>
+            </tr>
+        """
 
         text_content = (
             f'Hi {order.user.username},\n\n'
@@ -48,42 +75,28 @@ def send_order_confirmation_email_task(order_id):
             <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
 
                 <div style="background:linear-gradient(90deg,#2563EB,#9333EA);padding:24px;text-align:center;">
-                    <span style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.8px;font-family:Arial,Helvetica,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,0.15);">Wearify</span>
+                    <span style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.8px;text-shadow:0 1px 3px rgba(0,0,0,0.15);">Wearify</span>
                 </div>
 
                 <div style="padding:32px 28px;">
                     <p style="margin:0 0 4px;color:#16a34a;font-size:13px;font-weight:700;letter-spacing:0.05em;">ORDER CONFIRMED</p>
-                    <h2 style="margin:0 0 20px;color:#0f172a;font-size:20px;">Hi {order.user.username}, thanks for your order!</h2>
-                    <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6;">
+                    <h2 style="margin:0 0 20px;color:#0f172a;font-size:22px;font-weight:700;">Hi {order.user.username}, thanks for your order!</h2>
+                    <p style="margin:0 0 24px;color:#475569;font-size:15px;font-weight:500;line-height:1.6;">
                         Great news! Your order has been confirmed and is now being processed. We'll notify you again once it ships.
                     </p>
 
                     <div style="background:#f8fafc;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
-                        <p style="margin:0;color:#64748b;font-size:12px;">ORDER NUMBER</p>
-                        <p style="margin:4px 0 0;color:#0f172a;font-size:16px;font-weight:700;">{order.order_number}</p>
+                        <p style="margin:0;color:#64748b;font-size:13px;">ORDER NUMBER</p>
+                        <p style="margin:4px 0 0;color:#0f172a;font-size:18px;font-weight:700;">{order.order_number}</p>
                     </div>
 
                     <table style="width:100%;border-collapse:collapse;">
                         {items_rows}
-                        <tr>
-                            <td style="padding:12px 0 4px;color:#64748b;font-size:13px;">Subtotal</td>
-                            <td style="padding:12px 0 4px;color:#0f172a;font-size:13px;text-align:right;white-space:nowrap;">{order.total_amount - order.shipping_cost} BDT</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:0 0 12px;color:#64748b;font-size:13px;">Shipping</td>
-                            <td style="padding:0 0 12px;color:#0f172a;font-size:13px;text-align:right;white-space:nowrap;">
-                                {'FREE' if order.shipping_cost == 0 else f'{order.shipping_cost} BDT'}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="padding:14px 0;border-top:2px solid #e2e8f0;font-weight:700;color:#0f172a;font-size:15px;">Total</td>
-                            <td style="padding:14px 0;border-top:2px solid #e2e8f0;font-weight:700;color:#2563EB;font-size:15px;text-align:right;white-space:nowrap;">{order.total_amount} BDT</td>
-                        </tr>
                     </table>
 
                     <div style="text-align:center;margin:32px 0 8px;">
                         <a href="{tracking_link}"
-                           style="background:linear-gradient(90deg,#2563EB,#9333EA);color:#ffffff;padding:14px 36px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
+                           style="background:linear-gradient(90deg,#2563EB,#9333EA);color:#ffffff;padding:14px 36px;border-radius:999px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">
                             Track Your Order
                         </a>
                     </div>

@@ -12,6 +12,7 @@ click-repl==0.3.0
 Django==6.0.7
 django-cors-headers==4.9.0
 django-filter==26.1
+django-unfold==0.102.0
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.30.0

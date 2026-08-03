@@ -192,6 +192,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['order']
 
 
+class OrderCouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = ['id', 'coupon_code', 'discount_percent']
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
@@ -206,15 +212,16 @@ class OrderSerializer(serializers.ModelSerializer):
     shipping_address_id = serializers.PrimaryKeyRelatedField(
         queryset=Address.objects.all(), source='shipping_address', write_only=True
     )
+    coupon = OrderCouponSerializer(read_only=True)
 
     class Meta:
         model = Order
         fields = [
-            'id', 'user', 'order_number', 'coupon', 'status',
+            'id', 'user', 'order_number', 'coupon', 'coupon_discount', 'status',
             'shipping_address', 'shipping_address_id', 'shipping_cost',
             'total_amount', 'created_at', 'items', 'payment'
         ]
-        read_only_fields = ['user', 'order_number', 'total_amount', 'shipping_cost']
+        read_only_fields = ['user', 'order_number', 'total_amount', 'shipping_cost', 'coupon_discount']
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -222,6 +229,14 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['id', 'product', 'user', 'rating', 'comment', 'created_at']
         read_only_fields = ['user']
+
+    def validate(self, data):
+        request = self.context.get('request')
+        product = data.get('product')
+        if request and product:
+            if Review.objects.filter(product=product, user=request.user).exclude(pk=self.instance.pk if self.instance else None).exists():
+                raise serializers.ValidationError("You have already reviewed this product.")
+        return data
 
 
 class WishlistSerializer(serializers.ModelSerializer):
