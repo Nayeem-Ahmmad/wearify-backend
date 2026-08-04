@@ -17,6 +17,11 @@ from rest_framework.throttling import AnonRateThrottle
 from .tasks import send_payment_success_email_task, send_contact_message_task
 from rest_framework.exceptions import NotFound
 
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -30,14 +35,14 @@ from django.db.models import F
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
-    Review, Wishlist, FlashSale
+    Review, Wishlist, FlashSale, StockNotification
 )
 from .serializers import (
     RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -285,6 +290,17 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({"error": "This order can no longer be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = 'cancelled'
         order.save()
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'])
+    def track(self, request):
+        order_number = request.data.get('order_id') or request.data.get('order_number')
+        if not order_number:
+            return Response({"error": "order_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            order = Order.objects.get(order_number=order_number, user=request.user)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
 
@@ -618,3 +634,91 @@ class ActiveFlashSaleView(generics.RetrieveAPIView):
         if not flash_sale:
             raise NotFound("No active flash sale")
         return flash_sale
+
+
+
+class StockNotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = StockNotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return StockNotification.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class OrderInvoiceView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id, user=request.user)
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice-{order.order_number}.pdf"'
+
+        p = canvas.Canvas(response, pagesize=A4)
+        width, height = A4
+
+        p.setFont("Helvetica-Bold", 18)
+        p.drawString(20 * mm, height - 25 * mm, "Wearify")
+        p.setFont("Helvetica", 10)
+        p.drawString(20 * mm, height - 32 * mm, "Gulshan, Dhaka, Bangladesh")
+        p.drawString(20 * mm, height - 37 * mm, "wearify.sells@gmail.com")
+
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(20 * mm, height - 50 * mm, f"Invoice - {order.order_number}")
+
+        p.setFont("Helvetica", 10)
+        p.drawString(20 * mm, height - 58 * mm, f"Customer: {order.user.username}")
+        p.drawString(20 * mm, height - 63 * mm, f"Date: {order.created_at.strftime('%d %b %Y')}")
+        p.drawString(20 * mm, height - 68 * mm, f"Status: {order.get_status_display()}")
+
+        if order.shipping_address:
+            p.drawString(20 * mm, height - 76 * mm, f"Shipping to: {order.shipping_address.full_address}")
+            p.drawString(20 * mm, height - 81 * mm, f"Phone: {order.shipping_address.phone}")
+
+        y = height - 95 * mm
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(20 * mm, y, "Item")
+        p.drawString(120 * mm, y, "Qty")
+        p.drawString(140 * mm, y, "Price")
+        p.drawString(165 * mm, y, "Subtotal")
+        p.line(20 * mm, y - 2 * mm, 190 * mm, y - 2 * mm)
+        y -= 8 * mm
+
+        p.setFont("Helvetica", 9)
+        for item in order.items.all():
+            name = f"{item.variant.product.name} ({item.variant.size}/{item.variant.color})"
+            p.drawString(20 * mm, y, name[:45])
+            p.drawString(120 * mm, y, str(item.quantity))
+            p.drawString(140 * mm, y, f"{item.price_at_purchase} BDT")
+            p.drawString(165 * mm, y, f"{item.price_at_purchase * item.quantity} BDT")
+            y -= 6 * mm
+
+        y -= 4 * mm
+        p.line(20 * mm, y, 190 * mm, y)
+        y -= 8 * mm
+
+        subtotal = order.total_amount - order.shipping_cost + order.coupon_discount
+        p.setFont("Helvetica", 10)
+        p.drawString(140 * mm, y, "Subtotal:")
+        p.drawString(165 * mm, y, f"{subtotal} BDT")
+        y -= 6 * mm
+
+        if order.coupon_discount:
+            p.drawString(140 * mm, y, "Coupon:")
+            p.drawString(165 * mm, y, f"-{order.coupon_discount} BDT")
+            y -= 6 * mm
+
+        p.drawString(140 * mm, y, "Shipping:")
+        p.drawString(165 * mm, y, "FREE" if order.shipping_cost == 0 else f"{order.shipping_cost} BDT")
+        y -= 8 * mm
+
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(140 * mm, y, "Total:")
+        p.drawString(165 * mm, y, f"{order.total_amount} BDT")
+
+        p.showPage()
+        p.save()
+        return response

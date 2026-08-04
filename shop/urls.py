@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, ActiveFlashSaleView
+    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView
 )
 
 router = DefaultRouter()
@@ -19,6 +19,7 @@ router.register('orders', OrderViewSet, basename='order')
 router.register('payments', PaymentViewSet, basename='payment')
 router.register('reviews', ReviewViewSet, basename='review')
 router.register('wishlist', WishlistViewSet, basename='wishlist')
+router.register('stock-notifications', StockNotificationViewSet, basename='stock-notification')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -26,6 +27,7 @@ urlpatterns = [
     path('contact/', ContactMessageView.as_view(), name='contact'),
     path('flash-sale/active/', ActiveFlashSaleView.as_view(), name='active-flash-sale'),
     path('flash-sale/active/', ActiveFlashSaleView.as_view(), name='active-flash-sale'),
+    path('orders/<int:order_id>/invoice/', OrderInvoiceView.as_view(), name='order-invoice'),
     path('update-account/', UpdateAccountView.as_view(), name='update-account'),
     path('payment/initiate/<int:order_id>/', InitiatePaymentView.as_view(), name='payment-initiate'),
     path('payment/success/<int:order_id>/', PaymentSuccessView.as_view(), name='payment-success'),

@@ -395,3 +395,15 @@ class FlashSale(models.Model):
 
     def __str__(self):
         return f"{self.title} (-{self.discount_percent}%)"
+
+
+class StockNotification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stock_notifications')
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='stock_notifications')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'variant')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.variant}"

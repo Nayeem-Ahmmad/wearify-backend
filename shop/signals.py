@@ -3,8 +3,8 @@ from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import UserProfile, OrderItem, Order, Payment
-from .tasks import send_order_confirmation_email_task
+from .models import UserProfile, OrderItem, Order, Payment, ProductVariant, StockNotification
+from .tasks import send_stock_available_email_task, send_review_reminder_email_task, send_order_confirmation_email_task
 
 
 @receiver(post_save, sender=User)
@@ -65,3 +65,33 @@ def send_confirmation_email_on_status_change(sender, instance, created, **kwargs
     previous_status = getattr(instance, '_previous_status', None)
     if previous_status != 'confirmed' and instance.status == 'confirmed':
         send_order_confirmation_email_task.delay(instance.id)
+
+@receiver(pre_save, sender=ProductVariant)
+def capture_previous_stock(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            instance._previous_stock = ProductVariant.objects.get(pk=instance.pk).stock_quantity
+        except ProductVariant.DoesNotExist:
+            instance._previous_stock = None
+    else:
+        instance._previous_stock = None
+
+
+@receiver(post_save, sender=ProductVariant)
+def notify_stock_available(sender, instance, created, **kwargs):
+    if created:
+        return
+    previous_stock = getattr(instance, '_previous_stock', None)
+    if previous_stock == 0 and instance.stock_quantity > 0:
+        send_stock_available_email_task.delay(instance.id)
+
+
+@receiver(post_save, sender=Order)
+def schedule_review_reminder_on_delivery(sender, instance, created, **kwargs):
+    if created:
+        return
+    previous_status = getattr(instance, '_previous_status', None)
+    if previous_status != 'delivered' and instance.status == 'delivered':
+        send_review_reminder_email_task.apply_async(args=[instance.id], countdown=3 * 24 * 60 * 60)
+
+

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification
 )
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -261,3 +261,15 @@ class FlashSaleDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = FlashSale
         fields = ['id', 'title', 'discount_percent', 'start_time', 'end_time', 'products']
+
+
+class StockNotificationSerializer(serializers.ModelSerializer):
+    variant = ProductVariantSerializer(read_only=True)
+    variant_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.all(), source='variant', write_only=True
+    )
+
+    class Meta:
+        model = StockNotification
+        fields = ['id', 'user', 'variant', 'variant_id', 'created_at']
+        read_only_fields = ['user', 'created_at']

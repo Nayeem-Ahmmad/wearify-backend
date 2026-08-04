@@ -196,3 +196,77 @@ def send_contact_message_task(name, email, message):
         logger.info(f"Contact message email sent successfully from {email}")
     except Exception as e:
         logger.error(f"Failed to send contact message email from {email}: {e}")
+
+
+
+@shared_task
+def send_stock_available_email_task(variant_id):
+    from .models import ProductVariant, StockNotification
+
+    try:
+        variant = ProductVariant.objects.get(id=variant_id)
+    except ProductVariant.DoesNotExist:
+        logger.error(f"Variant {variant_id} not found for stock notification task")
+        return
+
+    notifications = StockNotification.objects.filter(variant=variant).select_related('user')
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    product_link = f"{frontend_url}/product/{variant.product.slug}"
+
+    for notification in notifications:
+        user = notification.user
+        if not user.email:
+            continue
+        send_mail(
+            subject=f'{variant.product.name} is back in stock!',
+            message=(
+                f'Hi {user.username},\n\n'
+                f'Good news! {variant.product.name} ({variant.size}/{variant.color}) is back in stock.\n\n'
+                f'Grab it before it runs out again: {product_link}\n\n'
+                f'Thank you for shopping with Wearify!'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+
+    notifications.delete()
+    logger.info(f"Stock available emails sent for variant {variant_id}")
+
+
+@shared_task
+def send_review_reminder_email_task(order_id):
+    from .models import Order
+
+    try:
+        order = Order.objects.get(id=order_id)
+    except Order.DoesNotExist:
+        logger.error(f"Order {order_id} not found for review reminder task")
+        return
+
+    if order.status != 'delivered':
+        return
+
+    items = order.items.all()
+    if not items:
+        return
+
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    product_lines = "\n".join(
+        f"  - {item.variant.product.name}: {frontend_url}/products/{item.variant.product.slug}#review"
+        for item in items
+    )
+
+    send_mail(
+        subject=f'How was your order {order.order_number}?',
+        message=(
+            f'Hi {order.user.username},\n\n'
+            f'We hope you are enjoying your recent purchase. Please take a moment to review the items below:\n\n'
+            f'{product_lines}\n\n'
+            f'Thank you for shopping with Wearify!'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[order.user.email],
+        fail_silently=True,
+    )
+    logger.info(f"Review reminder email sent for order {order.order_number}")
