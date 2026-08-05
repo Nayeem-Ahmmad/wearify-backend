@@ -1,0 +1,38 @@
+{% extends "unfold/layouts/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Monthly Sales Report</h2>
+        <a href="/admin/" class="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 dark:text-gray-400">
+                    <th class="pb-2">Month</th>
+                    <th class="pb-2 text-right">Total Sales</th>
+                    <th class="pb-2 text-right">Profit</th>
+                    <th class="pb-2 text-right">Orders</th>
+                    <th class="pb-2 text-right">Avg. Order Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="border-t border-gray-100 dark:border-gray-800">
+                    <td class="py-2 font-medium text-gray-900 dark:text-white">{{ row.month_label }}</td>
+                    <td class="py-2 text-right">{{ row.total_sales }}</td>
+                    <td class="py-2 text-right text-green-600 font-medium">{{ row.profit }}</td>
+                    <td class="py-2 text-right">{{ row.order_count }}</td>
+                    <td class="py-2 text-right">{{ row.avg_order }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="py-4 text-center text-gray-400">No sales data yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -77,6 +77,10 @@ class Product(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    cost_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Price you paid to acquire/manufacture this product — used to calculate profit"
+    )
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -107,6 +111,16 @@ class Product(models.Model):
         now = timezone.now()
         return self.flash_sales.filter(start_time__lte=now, end_time__gte=now).first()
 
+    @property
+    def profit_per_unit(self):
+        return self.base_price - self.cost_price
+
+    @property
+    def profit_margin_percent(self):
+        if self.base_price:
+            return round((self.profit_per_unit / self.base_price) * 100, 2)
+        return 0
+
     def get_related_products(self, limit=6):
         related = Product.objects.filter(
             category=self.category,
@@ -134,6 +148,10 @@ class ProductImage(models.Model):
         related_name='images'
     )
     image = models.ImageField(upload_to='products-images/')
+    color = models.CharField(
+        max_length=30, blank=True,
+        help_text="Which color this photo shows (must match a variant's color exactly, e.g. 'Black'). Leave empty for a general/default photo."
+    )
 
     def __str__(self):
         return f"Image of {self.product.name}"

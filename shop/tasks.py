@@ -6,8 +6,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task
-def send_order_confirmation_email_task(order_id):
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_order_confirmation_email_task(self, order_id): 
     from .models import Order
     from django.core.mail import EmailMultiAlternatives
     from django.conf import settings
@@ -123,10 +123,12 @@ def send_order_confirmation_email_task(order_id):
         logger.info(f"Confirmation email sent for order {order.order_number}")
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for email task")
+    except Exception as exc:
+        logger.error(f"Failed to send confirmation email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
+        raise self.retry(exc=exc)
 
-
-@shared_task
-def notify_admin_new_order_task(order_id):
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def notify_admin_new_order_task(self, order_id):
     from .models import Order
     try:
         order = Order.objects.get(id=order_id)
@@ -153,10 +155,13 @@ def notify_admin_new_order_task(order_id):
         logger.info(f"Admin notification sent for order {order.order_number}")
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for admin email task")
+    except Exception as exc:
+        logger.error(f"Failed to send admin notification (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
+        raise self.retry(exc=exc)
 
 
-@shared_task
-def send_payment_success_email_task(order_id):
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_payment_success_email_task(self, order_id):
     from .models import Order
     try:
         order = Order.objects.get(id=order_id)
@@ -175,12 +180,15 @@ def send_payment_success_email_task(order_id):
         logger.info(f"Payment success email sent for order {order.order_number}")
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for payment email task")
+    except Exception as exc:
+        logger.error(f"Failed to send payment success email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
+        raise self.retry(exc=exc)
 
 
 
 
-@shared_task
-def send_contact_message_task(name, email, message):
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_contact_message_task(self, name, email, message):
     try:
         send_mail(
             subject=f'New Contact Message from {name}',
@@ -194,8 +202,9 @@ def send_contact_message_task(name, email, message):
             fail_silently=False,
         )
         logger.info(f"Contact message email sent successfully from {email}")
-    except Exception as e:
-        logger.error(f"Failed to send contact message email from {email}: {e}")
+    except Exception as exc:
+        logger.error(f"Failed to send contact message email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
+        raise self.retry(exc=exc)
 
 
 
@@ -270,3 +279,68 @@ def send_review_reminder_email_task(order_id):
         fail_silently=True,
     )
     logger.info(f"Review reminder email sent for order {order.order_number}")
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_password_reset_email_task(self, user_id, uid, token):
+    from django.contrib.auth.models import User
+    from django.core.mail import EmailMultiAlternatives
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        logger.error(f"User {user_id} not found for password reset email task")
+        return
+
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    reset_link = f'{frontend_url}/reset-password?uid={uid}&token={token}'
+
+    text_content = (
+        f'Hi {user.username},\n\n'
+        f'We received a request to reset your Wearify password.\n\n'
+        f'Reset your password: {reset_link}\n\n'
+        f'This link can only be used once. If you did not request this, you can safely ignore this email.\n\n'
+        f'Thank you,\nWearify'
+    )
+
+    html_content = f"""
+    <div style="background:#f4f6fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+        <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+            <div style="background:linear-gradient(90deg,#2563EB,#9333EA);padding:24px;text-align:center;">
+                <span style="font-size:28px;font-weight:800;color:#ffffff;">Wearify</span>
+            </div>
+            <div style="padding:32px 28px;">
+                <h2 style="margin:0 0 16px;color:#0f172a;font-size:19px;">Reset your password</h2>
+                <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6;">
+                    Hi {user.username}, we received a request to reset your Wearify password. Click the button below to choose a new one.
+                </p>
+                <div style="text-align:center;margin:28px 0;">
+                    <a href="{reset_link}"
+                       style="background:linear-gradient(90deg,#2563EB,#9333EA);color:#ffffff;padding:14px 36px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
+                        Reset Password
+                    </a>
+                </div>
+                <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.6;">
+                    This link can only be used once. If you didn't request this, you can safely ignore this email.
+                </p>
+            </div>
+            <div style="background:#0f172a;padding:20px 28px;text-align:center;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">Wearify &middot; wearify.sells@gmail.com</p>
+            </div>
+        </div>
+    </div>
+    """
+
+    try:
+        email = EmailMultiAlternatives(
+            subject='Reset your Wearify password',
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user.email],
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send(fail_silently=False)
+        logger.info(f"Password reset email sent to {user.email}")
+    except Exception as exc:
+        logger.error(f"Failed to send password reset email to {user.email}: {exc}")
+        raise self.retry(exc=exc)

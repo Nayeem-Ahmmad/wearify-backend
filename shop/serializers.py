@@ -18,13 +18,13 @@ class ContactMessageSerializer(serializers.Serializer):
     email = serializers.EmailField()
     message = serializers.CharField()
 
-    def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            password=validated_data['password']
-        )
-        return user
+    # def create(self, validated_data):
+    #     user = User.objects.create_user(
+    #         username=validated_data['username'],
+    #         email=validated_data.get('email', ''),
+    #         password=validated_data['password']
+    #     )
+    #     return user
 
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -84,7 +84,7 @@ class TagSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['id', 'product', 'image']
+        fields = ['id', 'product', 'image', 'color']
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -108,12 +108,14 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         return obj.product.brand.name if obj.product.brand else None
 
     def get_product_image(self, obj):
-        first_image = obj.product.images.first()
+        first_image = obj.product.images.filter(color=obj.color).first()
+        if not first_image:
+            first_image = obj.product.images.first()
         if not first_image:
             return None
         request = self.context.get('request')
         url = first_image.image.url
-        return request.build_absolute_uri(url) if request else url 
+        return request.build_absolute_uri(url) if request else url
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -225,9 +227,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
+
+    user_name = serializers.CharField(source='user.username', read_only=True)
     class Meta:
         model = Review
-        fields = ['id', 'product', 'user', 'rating', 'comment', 'created_at']
+        fields = ['id', 'product', 'user', 'user_name', 'rating', 'comment', 'created_at']
         read_only_fields = ['user']
 
     def validate(self, data):
@@ -273,3 +277,15 @@ class StockNotificationSerializer(serializers.ModelSerializer):
         model = StockNotification
         fields = ['id', 'user', 'variant', 'variant_id', 'created_at']
         read_only_fields = ['user', 'created_at']
+
+
+#--------------Forget password fix-------------------------------------
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)

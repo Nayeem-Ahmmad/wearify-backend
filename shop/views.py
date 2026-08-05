@@ -17,6 +17,12 @@ from rest_framework.throttling import AnonRateThrottle
 from .tasks import send_payment_success_email_task, send_contact_message_task
 from rest_framework.exceptions import NotFound
 
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from .tasks import send_password_reset_email_task
+
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -62,6 +68,7 @@ class ActiveFlashSaleView(generics.RetrieveAPIView):
         if not flash_sale:
             raise NotFound("No active flash sale")
         return flash_sale
+
 
 
 class ContactMessageView(APIView):
@@ -621,20 +628,6 @@ class PaymentCancelView(APIView):
             return Response({'error': 'Payment processing failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ActiveFlashSaleView(generics.RetrieveAPIView):
-    serializer_class = FlashSaleDetailSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def get_object(self):
-        now = timezone.now()
-        flash_sale = FlashSale.objects.filter(
-            start_time__lte=now,
-            end_time__gte=now
-        ).prefetch_related('products').first()
-        if not flash_sale:
-            raise NotFound("No active flash sale")
-        return flash_sale
-
 
 
 class StockNotificationViewSet(viewsets.ModelViewSet):
@@ -722,3 +715,50 @@ class OrderInvoiceView(APIView):
         p.showPage()
         p.save()
         return response
+    
+
+
+#----------------Forget password-----------------------------------------
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            send_password_reset_email_task.delay(user.id, uid, token)
+
+        return Response(
+            {"message": "If an account with this email exists, a reset link has been sent."},
+            status=status.HTTP_200_OK
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uid = serializer.validated_data['uid']
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({"error": "Invalid or expired reset link"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Invalid or expired reset link"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password reset successful"}, status=status.HTTP_200_OK)

@@ -11,6 +11,11 @@
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ item.title }}</p>
             <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ item.metric }}</p>
             <p class="mt-1 text-xs text-gray-400">{{ item.footer }}</p>
+            {% if item.title == "Total Sales" %}
+            <a href="/admin/monthly-sales/" class="inline-block mt-5 text-xs font-medium text-blue-600 hover:underline">
+                View Monthly Breakdown →
+            </a>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
