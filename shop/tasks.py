@@ -60,19 +60,41 @@ def send_order_confirmation_email_task(self, order_id):
             </tr>
         """
 
+        shipping_block = ""
+        if order.shipping_address:
+            shipping_block = (
+                f'\nShip To      : {order.shipping_address.full_name}\n'
+                f'Address      : {order.shipping_address.full_address}\n'
+                f'Phone        : {order.shipping_address.phone}\n'
+            )
+
         text_content = (
             f'Hi {order.user.username},\n\n'
             f'Great news! Your order has been confirmed and is now being processed.\n\n'
             f'Order Number : {order.order_number}\n'
-            f'Total Amount : {order.total_amount} BDT\n\n'
+            f'Order Date   : {order.created_at.strftime("%B %d, %Y")}\n'
+            f'Total Amount : {order.total_amount} BDT\n'
+            f'{shipping_block}\n'
             f'Track your order: {tracking_link}\n\n'
             f'We will notify you once your order is shipped.\n\n'
-            f'Thank you for shopping with Wearify!'
+            f'Thank you so much for shopping with Wearify — we truly appreciate your trust in us!\n\n'
+            f'Warm regards,\nTeam Wearify'
         )
+
+        shipping_html = ""
+        if order.shipping_address:
+            shipping_html = f"""
+                <div>
+                    <p style="margin:0 0 4px;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.05em;">SHIP TO</p>
+                    <p style="margin:0;color:#0f172a;font-size:13px;font-weight:600;">{order.shipping_address.full_name}</p>
+                    <p style="margin:2px 0 0;color:#64748b;font-size:12px;line-height:1.5;">{order.shipping_address.full_address}</p>
+                    <p style="margin:2px 0 0;color:#64748b;font-size:12px;">{order.shipping_address.phone}</p>
+                </div>
+            """
 
         html_content = f"""
         <div style="background:#f4f6fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
-            <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+            <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
 
                 <div style="background:linear-gradient(90deg,#2563EB,#9333EA);padding:24px;text-align:center;">
                     <span style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.8px;text-shadow:0 1px 3px rgba(0,0,0,0.15);">Wearify</span>
@@ -85,9 +107,21 @@ def send_order_confirmation_email_task(self, order_id):
                         Great news! Your order has been confirmed and is now being processed. We'll notify you again once it ships.
                     </p>
 
-                    <div style="background:#f8fafc;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
-                        <p style="margin:0;color:#64748b;font-size:13px;">ORDER NUMBER</p>
-                        <p style="margin:4px 0 0;color:#0f172a;font-size:18px;font-weight:700;">{order.order_number}</p>
+                    <div style="border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+                        <p style="margin:0 0 14px;color:#0f172a;font-size:15px;font-weight:700;">INVOICE</p>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <tr>
+                                <td style="vertical-align:top;width:50%;">
+                                    <p style="margin:0 0 4px;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.05em;">ORDER NUMBER</p>
+                                    <p style="margin:0 0 12px;color:#0f172a;font-size:14px;font-weight:700;">{order.order_number}</p>
+                                    <p style="margin:0 0 4px;color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.05em;">ORDER DATE</p>
+                                    <p style="margin:0;color:#0f172a;font-size:13px;">{order.created_at.strftime("%B %d, %Y")}</p>
+                                </td>
+                                <td style="vertical-align:top;width:50%;">
+                                    {shipping_html}
+                                </td>
+                            </tr>
+                        </table>
                     </div>
 
                     <table style="width:100%;border-collapse:collapse;">
@@ -99,6 +133,11 @@ def send_order_confirmation_email_task(self, order_id):
                            style="background:linear-gradient(90deg,#2563EB,#9333EA);color:#ffffff;padding:14px 36px;border-radius:999px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">
                             Track Your Order
                         </a>
+                    </div>
+
+                    <div style="border-top:1px solid #f1f5f9;margin-top:28px;padding-top:20px;text-align:center;">
+                        <p style="margin:0;color:#0f172a;font-size:14px;font-weight:600;">Thank you so much for shopping with Wearify!</p>
+                        <p style="margin:6px 0 0;color:#94a3b8;font-size:12px;">We truly appreciate your trust in us and can't wait for you to receive your order. 💙</p>
                     </div>
                 </div>
 
