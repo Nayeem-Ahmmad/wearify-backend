@@ -1,16 +1,16 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
 # settings.py
 
-FRONTEND_URL = "http://localhost:5173"
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = 'django-insecure-)it*%ctmeqj&5x$yvt_g^t$ah@5*=g$727kp78=j5!cwkxm(c^'
-DEBUG = True
-ALLOWED_HOSTS = []
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # Application definition
 
@@ -222,9 +222,9 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
 
-SSLCOMMERZ_STORE_ID = 'weari6a64827f01b62'
-SSLCOMMERZ_STORE_PASSWORD = 'weari6a64827f01b62@ssl'
-SSLCOMMERZ_IS_SANDBOX = True
+SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID')
+SSLCOMMERZ_STORE_PASSWORD = config('SSLCOMMERZ_STORE_PASSWORD')
+SSLCOMMERZ_IS_SANDBOX = config('SSLCOMMERZ_IS_SANDBOX', default=True, cast=bool)
 
 #----------------- Email send _______________________________________
 #EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -232,9 +232,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'wearify.sells@gmail.com'
-EMAIL_HOST_PASSWORD = 'arxlaihwphekqtdp'
-DEFAULT_FROM_EMAIL = 'Wearify <wearify.sells@gmail.com>'
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'Wearify <{EMAIL_HOST_USER}>')
 
 
 SPECTACULAR_SETTINGS = {
@@ -281,14 +281,15 @@ LOGGING = {
 }
 
 #.......................celery and redis.........................................
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Dhaka'
 
 #................Vite default port............................
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS', default='http://localhost:5173',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
