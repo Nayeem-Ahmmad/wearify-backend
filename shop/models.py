@@ -112,6 +112,15 @@ class Product(models.Model):
         return self.flash_sales.filter(start_time__lte=now, end_time__gte=now).first()
 
     @property
+    def average_rating(self):
+        result = self.reviews.aggregate(avg=models.Avg('rating'))['avg']
+        return round(result, 1) if result is not None else None
+
+    @property
+    def review_count(self):
+        return self.reviews.count()
+
+    @property
     def profit_per_unit(self):
         return self.base_price - self.cost_price
 
@@ -425,3 +434,12 @@ class StockNotification(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.variant}"
+
+
+class NewsletterSubscriber(models.Model):
+    email = models.EmailField(unique=True)
+    is_active = models.BooleanField(default=True)
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.email

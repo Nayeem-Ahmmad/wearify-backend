@@ -383,3 +383,84 @@ def send_password_reset_email_task(self, user_id, uid, token):
     except Exception as exc:
         logger.error(f"Failed to send password reset email to {user.email}: {exc}")
         raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_flash_sale_email_task(self, flash_sale_id):
+    from .models import FlashSale, NewsletterSubscriber
+    from django.core.mail import EmailMultiAlternatives
+
+    try:
+        flash_sale = FlashSale.objects.get(id=flash_sale_id)
+    except FlashSale.DoesNotExist:
+        logger.error(f"FlashSale {flash_sale_id} not found for newsletter email task")
+        return
+
+    subscribers = NewsletterSubscriber.objects.filter(is_active=True)
+    if not subscribers.exists():
+        logger.info("No active newsletter subscribers to notify")
+        return
+
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    deals_link = f'{frontend_url}/deals'
+    products = list(flash_sale.products.all()[:4])
+
+    products_html = "".join(
+        f"""
+        <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0;color:#0f172a;font-size:14px;font-weight:600;">{p.name}</p>
+            <p style="margin:2px 0 0;color:#2563EB;font-size:13px;">
+                -{flash_sale.discount_percent}% off — now ৳{round(p.base_price * (1 - flash_sale.discount_percent / 100), 2)}
+            </p>
+        </div>
+        """
+        for p in products
+    )
+
+    html_content = f"""
+    <div style="background:#f4f6fb;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+        <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+            <div style="background:linear-gradient(90deg,#2563EB,#9333EA);padding:24px;text-align:center;">
+                <span style="font-size:28px;font-weight:800;color:#ffffff;">Wearify</span>
+            </div>
+            <div style="padding:32px 28px;">
+                <p style="margin:0 0 4px;color:#dc2626;font-size:13px;font-weight:700;letter-spacing:0.05em;">⚡ FLASH SALE LIVE NOW</p>
+                <h2 style="margin:0 0 16px;color:#0f172a;font-size:20px;">{flash_sale.title} — {flash_sale.discount_percent}% Off</h2>
+                <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
+                    Limited time only! Grab your favorites before this deal ends.
+                </p>
+                {products_html}
+                <div style="text-align:center;margin:28px 0 8px;">
+                    <a href="{deals_link}"
+                       style="background:linear-gradient(90deg,#2563EB,#9333EA);color:#ffffff;padding:14px 36px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
+                        Shop the Sale
+                    </a>
+                </div>
+            </div>
+            <div style="background:#0f172a;padding:20px 28px;text-align:center;">
+                <p style="margin:0;color:#94a3b8;font-size:12px;">Wearify &middot; wearify.sells@gmail.com</p>
+            </div>
+        </div>
+    </div>
+    """
+
+    text_content = (
+        f'Flash Sale Live Now: {flash_sale.title} — {flash_sale.discount_percent}% off!\n\n'
+        f'Shop now: {deals_link}\n\n'
+        f'Thank you for shopping with Wearify!'
+    )
+
+    try:
+        for subscriber in subscribers:
+            email = EmailMultiAlternatives(
+                subject=f'⚡ {flash_sale.discount_percent}% Off — {flash_sale.title} is Live!',
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[subscriber.email],
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send(fail_silently=True)
+        logger.info(f"Flash sale email sent to {subscribers.count()} subscribers for {flash_sale.title}")
+    except Exception as exc:
+        logger.error(f"Failed to send flash sale emails: {exc}")
+        raise self.retry(exc=exc)

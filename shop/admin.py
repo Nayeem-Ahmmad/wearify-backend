@@ -10,9 +10,10 @@ from unfold.admin import ModelAdmin, TabularInline
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, NewsletterSubscriber
 )
 from .tasks import send_order_confirmation_email_task
+from .tasks import send_flash_sale_email_task
 
 
 class ProductImageInline(TabularInline):
@@ -130,6 +131,16 @@ class CartAdmin(ModelAdmin):
 class FlashSaleAdmin(ModelAdmin):
     list_display = ['title', 'discount_percent', 'start_time', 'end_time']
     filter_horizontal = ['products']
+    actions = ['notify_subscribers']
+
+    def notify_subscribers(self, request, queryset):
+        count = 0
+        for flash_sale in queryset:
+            send_flash_sale_email_task.delay(flash_sale.id)
+            count += 1
+        self.message_user(request, f'Notification email queued for {count} flash sale(s).', messages.SUCCESS)
+
+    notify_subscribers.short_description = "Notify newsletter subscribers"
 
 
 @admin.register(UserProfile)
@@ -153,3 +164,10 @@ class CartItemAdmin(ModelAdmin):
 class WishlistAdmin(ModelAdmin):
     list_display = ['user', 'product']
     search_fields = ['user__username', 'product__name']
+
+
+@admin.register(NewsletterSubscriber)
+class NewsletterSubscriberAdmin(ModelAdmin):
+    list_display = ['email', 'is_active', 'subscribed_at']
+    list_filter = ['is_active']
+    search_fields = ['email']

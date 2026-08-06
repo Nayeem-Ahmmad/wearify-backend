@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber
 )
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -134,12 +134,14 @@ class ProductSerializer(serializers.ModelSerializer):
         queryset=Tag.objects.all(), source='tags', many=True, write_only=True, required=False
     )
     flash_sale_end = serializers.SerializerMethodField()
+    average_rating = serializers.ReadOnlyField()
+    review_count = serializers.ReadOnlyField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'description', 'base_price',
-            'flash_sale_end',
+            'flash_sale_end','average_rating', 'review_count',
             'category', 'category_id', 'brand', 'brand_id',
             'tags', 'tag_ids', 'images', 'variants',
             'is_active', 'created_at'
@@ -289,3 +291,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(write_only=True, min_length=8)
+
+
+class NewsletterSubscriberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NewsletterSubscriber
+        fields = ['id', 'email', 'subscribed_at']
+        read_only_fields = ['id', 'subscribed_at']

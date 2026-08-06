@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView
+    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView, NewsletterSubscribeView
 )
 
 router = DefaultRouter()
@@ -34,4 +34,5 @@ urlpatterns = [
     path('payment/cancel/<int:order_id>/', PaymentCancelView.as_view(), name='payment-cancel'),
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password-reset-request'),
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
+    path('newsletter/subscribe/', NewsletterSubscribeView.as_view(), name='newsletter-subscribe'),
 ]

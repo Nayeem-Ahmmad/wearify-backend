@@ -41,14 +41,14 @@ from django.db.models import F
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
-    Review, Wishlist, FlashSale, StockNotification
+    Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber
 )
 from .serializers import (
     RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -762,3 +762,23 @@ class PasswordResetConfirmView(APIView):
         user.save()
 
         return Response({"message": "Password reset successful"}, status=status.HTTP_200_OK)
+
+
+
+class NewsletterSubscribeView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        serializer = NewsletterSubscriberSerializer(data={'email': email})
+        serializer.is_valid(raise_exception=True)
+
+        existing = NewsletterSubscriber.objects.filter(email__iexact=email).first()
+        if existing:
+            if not existing.is_active:
+                existing.is_active = True
+                existing.save()
+            return Response({"message": "You're already subscribed!"}, status=status.HTTP_200_OK)
+
+        NewsletterSubscriber.objects.create(email=email)
+        return Response({"message": "Subscribed successfully!"}, status=status.HTTP_201_CREATED)
