@@ -5,12 +5,19 @@ from django.contrib import admin, messages
 from django.core.mail import send_mail
 from django.conf import settings
 
+from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
+
+import csv
+import io
+from django.http import HttpResponse
+from django.urls import path
+from django.shortcuts import redirect, render
 
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale, NewsletterSubscriber
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, NewsletterSubscriber, SizeChartRow, SizeChart, ReturnRequest
 )
 from .tasks import send_order_confirmation_email_task
 from .tasks import send_flash_sale_email_task
@@ -35,6 +42,7 @@ class ProductAdmin(ModelAdmin):
     search_fields = ['name', 'slug']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductImageInline, ProductVariantInline]
+    change_list_template = 'admin/shop/product/change_list.html'
 
     class Media:
             js = ('shop/js/variant_color_sync.js',)
@@ -42,6 +50,110 @@ class ProductAdmin(ModelAdmin):
     def profit_display(self, obj):
         return f"৳{obj.profit_per_unit:,.2f} ({obj.profit_margin_percent}%)"
     profit_display.short_description = "Profit / Margin"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('import-csv/', self.admin_site.admin_view(self.import_csv), name='shop_product_import_csv'),
+            path('export-csv/', self.admin_site.admin_view(self.export_csv), name='shop_product_export_csv'),
+        ]
+        return custom_urls + urls
+
+    def export_csv(self, request):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="products_export.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'product_name', 'description', 'base_price', 'cost_price', 'category', 'brand', 'tags',
+            'is_active', 'color', 'size', 'sku', 'price_override', 'stock_quantity'
+        ])
+        for variant in ProductVariant.objects.select_related('product', 'product__category', 'product__brand').all():
+            p = variant.product
+            writer.writerow([
+                p.name, p.description, p.base_price, p.cost_price,
+                p.category.slug if p.category else '',
+                p.brand.name if p.brand else '',
+                ','.join(p.tags.values_list('name', flat=True)),
+                p.is_active,
+                variant.color, variant.size, variant.sku,
+                variant.price_override or '', variant.stock_quantity,
+            ])
+        return response
+
+    def import_csv(self, request):
+        if request.method == 'POST':
+            csv_file = request.FILES.get('csv_file')
+            if not csv_file or not csv_file.name.endswith('.csv'):
+                self.message_user(request, 'Please upload a valid .csv file', messages.ERROR)
+                return redirect('..')
+
+            decoded = csv_file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(decoded))
+
+            created_products, created_variants, errors = 0, 0, []
+
+            for i, row in enumerate(reader, start=2):
+                try:
+                    name = row['product_name'].strip()
+                    if not name:
+                        continue
+
+                    category = None
+                    if row.get('category'):
+                        category = Category.objects.filter(slug=row['category'].strip()).first()
+
+                    brand = None
+                    if row.get('brand'):
+                        brand, _ = Brand.objects.get_or_create(name=row['brand'].strip())
+
+                    product, product_created = Product.objects.get_or_create(
+                        name=name,
+                        defaults={
+                            'description': row.get('description', ''),
+                            'base_price': row['base_price'],
+                            'cost_price': row.get('cost_price') or 0,
+                            'category': category,
+                            'brand': brand,
+                            'is_active': row.get('is_active', 'True').strip().lower() in ('true', '1', 'yes'),
+                        }
+                    )
+                    if product_created:
+                        created_products += 1
+                        if row.get('tags'):
+                            tag_names = [t.strip() for t in row['tags'].split(',') if t.strip()]
+                            for tag_name in tag_names:
+                                tag, _ = Tag.objects.get_or_create(name=tag_name)
+                                product.tags.add(tag)
+
+                    sku = row.get('sku', '').strip()
+                    if sku and not ProductVariant.objects.filter(sku=sku).exists():
+                        ProductVariant.objects.create(
+                            product=product,
+                            color=row.get('color', '').strip(),
+                            size=row.get('size', '').strip(),
+                            sku=sku,
+                            price_override=row.get('price_override') or None,
+                            stock_quantity=row.get('stock_quantity') or 0,
+                        )
+                        created_variants += 1
+
+                except Exception as e:
+                    errors.append(f"Row {i}: {str(e)}")
+
+            msg = f'{created_products} new product(s), {created_variants} new variant(s) imported.'
+            if errors:
+                msg += f' {len(errors)} row(s) failed: ' + '; '.join(errors[:5])
+                self.message_user(request, msg, messages.WARNING)
+            else:
+                self.message_user(request, msg, messages.SUCCESS)
+
+            return redirect('..')
+        context = {
+            **self.admin_site.each_context(request),
+            'opts': self.model._meta,
+            'title': 'Import Products from CSV',
+        }
+        return render(request, 'admin/shop/product/import_csv.html', context)
 
 
 @admin.register(Category)
@@ -171,3 +283,41 @@ class NewsletterSubscriberAdmin(ModelAdmin):
     list_display = ['email', 'is_active', 'subscribed_at']
     list_filter = ['is_active']
     search_fields = ['email']
+
+
+class SizeChartRowInline(TabularInline):
+    model = SizeChartRow
+    extra = 1
+
+
+@admin.register(SizeChart)
+class SizeChartAdmin(ModelAdmin):
+    list_display = ['__str__', 'unit']
+    list_filter = ['unit']
+    inlines = [SizeChartRowInline]
+
+
+@admin.register(ReturnRequest)
+class ReturnRequestAdmin(ModelAdmin):
+    list_display = ['order', 'status', 'created_at']
+    list_filter = ['status']
+    search_fields = ['order__order_number']
+    readonly_fields = ['order', 'reason', 'created_at']
+    actions = ['approve_returns', 'reject_returns']
+
+    def approve_returns(self, request, queryset):
+        count = 0
+        for rr in queryset.filter(status='pending'):
+            rr.status = 'approved'
+            rr.resolved_at = timezone.now()
+            rr.save()
+            rr.order.status = 'returned'
+            rr.order.save()
+            count += 1
+        self.message_user(request, f'{count} return(s) approved.', messages.SUCCESS)
+    approve_returns.short_description = "Approve selected returns"
+
+    def reject_returns(self, request, queryset):
+        count = queryset.filter(status='pending').update(status='rejected', resolved_at=timezone.now())
+        self.message_user(request, f'{count} return(s) rejected.', messages.SUCCESS)
+    reject_returns.short_description = "Reject selected returns"

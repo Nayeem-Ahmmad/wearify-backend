@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView, NewsletterSubscribeView
+    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView, NewsletterSubscribeView, ReturnRequestViewSet
 )
 
 router = DefaultRouter()
@@ -20,6 +20,7 @@ router.register('payments', PaymentViewSet, basename='payment')
 router.register('reviews', ReviewViewSet, basename='review')
 router.register('wishlist', WishlistViewSet, basename='wishlist')
 router.register('stock-notifications', StockNotificationViewSet, basename='stock-notification')
+router.register('returns', ReturnRequestViewSet, basename='return-request')
 
 urlpatterns = [
     path('', include(router.urls)),

@@ -1,0 +1,16 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+<li>
+    <a href="import-csv/" class="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">
+        Import CSV
+    </a>
+</li>
+<li>
+    <a href="export-csv/" class="px-3 py-2 rounded-md text-sm font-medium border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300">
+        Export CSV
+    </a>
+</li>
+{{ block.super }}
+{% endblock %}

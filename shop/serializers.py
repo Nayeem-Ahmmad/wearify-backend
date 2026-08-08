@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, SizeChart, SizeChartRow, ReturnRequest
 )
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -136,6 +136,8 @@ class ProductSerializer(serializers.ModelSerializer):
     flash_sale_end = serializers.SerializerMethodField()
     average_rating = serializers.ReadOnlyField()
     review_count = serializers.ReadOnlyField()
+    size_chart = serializers.SerializerMethodField()
+
 
     class Meta:
         model = Product
@@ -143,13 +145,20 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'description', 'base_price',
             'flash_sale_end','average_rating', 'review_count',
             'category', 'category_id', 'brand', 'brand_id',
-            'tags', 'tag_ids', 'images', 'variants',
+            'tags', 'tag_ids', 'images', 'variants', 'size_chart',
             'is_active', 'created_at'
         ]
 
     def get_flash_sale_end(self, obj):
         flash_sale = obj.get_active_flash_sale()
         return flash_sale.end_time if flash_sale else None
+    def get_size_chart(self, obj):
+        size_chart = getattr(obj, 'size_chart', None)
+        if not size_chart and obj.category:
+            size_chart = getattr(obj.category, 'size_chart', None)
+        if not size_chart or not size_chart.rows.exists():
+            return None
+        return SizeChartSerializer(size_chart).data
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -208,6 +217,11 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = ['id', 'order', 'method', 'status', 'transaction_id', 'paid_at']
         read_only_fields = ['order']
 
+class OrderReturnRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReturnRequest
+        fields = ['id', 'status', 'reason', 'admin_note', 'created_at']
+
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
@@ -217,13 +231,14 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=Address.objects.all(), source='shipping_address', write_only=True
     )
     coupon = OrderCouponSerializer(read_only=True)
+    return_request = OrderReturnRequestSerializer(read_only=True)
 
     class Meta:
         model = Order
         fields = [
             'id', 'user', 'order_number', 'coupon', 'coupon_discount', 'status',
             'shipping_address', 'shipping_address_id', 'shipping_cost',
-            'total_amount', 'created_at', 'items', 'payment'
+            'total_amount', 'created_at', 'items', 'payment', 'return_request'
         ]
         read_only_fields = ['user', 'order_number', 'total_amount', 'shipping_cost', 'coupon_discount']
 
@@ -298,3 +313,26 @@ class NewsletterSubscriberSerializer(serializers.ModelSerializer):
         model = NewsletterSubscriber
         fields = ['id', 'email', 'subscribed_at']
         read_only_fields = ['id', 'subscribed_at']
+
+
+class SizeChartRowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SizeChartRow
+        fields = ['size', 'chest', 'waist', 'hip', 'length']
+
+
+class SizeChartSerializer(serializers.ModelSerializer):
+    rows = SizeChartRowSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SizeChart
+        fields = ['id', 'unit', 'rows']
+
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+    order_number = serializers.CharField(source='order.order_number', read_only=True)
+
+    class Meta:
+        model = ReturnRequest
+        fields = ['id', 'order', 'order_number', 'reason', 'status', 'admin_note', 'created_at']
+        read_only_fields = ['status', 'admin_note', 'created_at']

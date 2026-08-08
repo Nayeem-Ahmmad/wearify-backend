@@ -1,7 +1,7 @@
 from xml.dom import ValidationErr
 
 from django.utils import timezone
-from rest_framework import viewsets, generics, status, permissions
+from rest_framework import serializers, viewsets, generics, status, permissions
 from rest_framework.views import APIView
 from django.utils.timezone import now
 from rest_framework.decorators import action
@@ -41,14 +41,14 @@ from django.db.models import F
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
-    Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber
+    Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, ReturnRequest
 )
 from .serializers import (
     RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer, ReturnRequestSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -117,7 +117,7 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
 class ProductPagination(PageNumberPagination):
-    page_size = 10
+    page_size = 12
     page_size_query_param = 'page_size'
     max_page_size = 50
     
@@ -782,3 +782,22 @@ class NewsletterSubscribeView(APIView):
 
         NewsletterSubscriber.objects.create(email=email)
         return Response({"message": "Subscribed successfully!"}, status=status.HTTP_201_CREATED)
+
+
+class ReturnRequestViewSet(viewsets.ModelViewSet):
+    serializer_class = ReturnRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'head']
+
+    def get_queryset(self):
+        return ReturnRequest.objects.filter(order__user=self.request.user).select_related('order')
+
+    def perform_create(self, serializer):
+        order = serializer.validated_data['order']
+        if order.user != self.request.user:
+            raise serializers.ValidationError({"error": "This order does not belong to you."})
+        if order.status != 'delivered':
+            raise serializers.ValidationError({"error": "Only delivered orders can be returned."})
+        if hasattr(order, 'return_request'):
+            raise serializers.ValidationError({"error": "A return request already exists for this order."})
+        serializer.save()

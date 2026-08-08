@@ -4,7 +4,7 @@ from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils import timezone
 
-# --------------------------- User Side ----------------------------------------------------------------------
+# --------------------------- User Side  ---------------------------------------------------------
 
 class UserProfile(models.Model):
     user = models.OneToOneField(
@@ -12,7 +12,7 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='profile'
     )
-    phone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=11)
     profile_image = models.ImageField(upload_to='profiles-photos/', null=True, blank=True)
 
     def __str__(self):
@@ -26,7 +26,7 @@ class Address(models.Model):
         related_name='addresses'
     )
     full_name = models.CharField(max_length=50)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=11)
     full_address = models.CharField(max_length=200)
     is_default = models.BooleanField(default=False)
 
@@ -34,7 +34,7 @@ class Address(models.Model):
         return f"{self.full_name} - {self.full_address}"
 
 
-# --------------------------- Product Catalog ------------------------------------------------------------
+# --------------------------- Product Catalog ------------------------------------------------------
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -183,7 +183,7 @@ class ProductVariant(models.Model):
     )
     size = models.CharField(max_length=10, blank=True, choices=SIZE_CHOICES)
     color = models.CharField(max_length=30, blank=True)
-    sku = models.CharField(max_length=50, unique=True)
+    sku = models.CharField(max_length=50)
     price_override = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock_quantity = models.PositiveIntegerField(default=0)
 
@@ -211,7 +211,7 @@ class ProductVariant(models.Model):
         return f"{self.product.name} - {self.size}/{self.color}"
 
 
-# ---------------------- Cart and Order --------------------------------------------------------------------
+# ---------------------- Cart and Order ------------------------------------------------------------
 
 class Cart(models.Model):
     user = models.OneToOneField(
@@ -443,3 +443,63 @@ class NewsletterSubscriber(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class SizeChart(models.Model):
+    UNIT_CHOICES = (
+        ('in', 'Inches'),
+        ('cm', 'Centimeters'),
+    )
+    product = models.OneToOneField(
+        Product, on_delete=models.CASCADE, null=True, blank=True, related_name='size_chart'
+    )
+    category = models.OneToOneField(
+        Category, on_delete=models.CASCADE, null=True, blank=True, related_name='size_chart'
+    )
+    unit = models.CharField(max_length=5, choices=UNIT_CHOICES, default='in')
+
+    def __str__(self):
+        if self.product:
+            return f"Size Chart - {self.product.name}"
+        if self.category:
+            return f"Size Chart - {self.category.name} (default)"
+        return "Size Chart (unassigned)"
+
+
+class SizeChartRow(models.Model):
+    size_chart = models.ForeignKey(
+        SizeChart,
+        on_delete=models.CASCADE,
+        related_name='rows'
+    )
+    size = models.CharField(max_length=10)
+    chest = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    waist = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    hip = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    length = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('size_chart', 'size')
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.size_chart} - {self.size}"
+
+
+class ReturnRequest(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+    order = models.OneToOneField(
+        Order, on_delete=models.CASCADE, related_name='return_request'
+    )
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Return - {self.order.order_number} ({self.status})"

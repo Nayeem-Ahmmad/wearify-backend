@@ -1,0 +1,26 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8 max-w-xl">
+    <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Import Products from CSV</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Columns: product_name, description, base_price, category, brand, tags, is_active, color, size, sku, price_override, stock_quantity
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="file" name="csv_file" accept=".csv" required
+                   class="block w-full text-sm text-gray-600 dark:text-gray-300 mb-4 border border-gray-200 dark:border-gray-800 rounded-md p-2" />
+            <div class="flex gap-3">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
+                    Upload & Import
+                </button>
+                <a href="../" class="px-4 py-2 border border-gray-200 dark:border-gray-800 rounded-md text-sm text-gray-600 dark:text-gray-300">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
