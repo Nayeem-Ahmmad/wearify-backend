@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils import timezone
+import uuid
 
 # --------------------------- User Side  ---------------------------------------------------------
 
@@ -252,11 +253,14 @@ class Coupon(models.Model):
     valid_from = models.DateTimeField()
     valid_to = models.DateTimeField()
     usage_limit = models.PositiveIntegerField(default=0)
+    times_used = models.PositiveIntegerField(default=0)
 
     def is_valid(self):
-        return (self.valid_from <= now() <= self.valid_to) and (
-            self.usage_limit > 0 or self.usage_limit == 0
-        )
+        if not (self.valid_from <= now() <= self.valid_to):
+            return False
+        if self.usage_limit > 0 and self.times_used >= self.usage_limit:
+            return False
+        return True
 
     def apply_discount(self, amount):
         if self.is_valid():
@@ -284,9 +288,12 @@ class Order(models.Model):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
+        null=True, #guest mode ar jnno
+        blank=True, # guest mode ar jnno
         related_name='orders'
     )
     order_number = models.CharField(max_length=30, unique=True)
+    public_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     coupon = models.ForeignKey(
         Coupon,
         on_delete=models.SET_NULL,
@@ -300,6 +307,10 @@ class Order(models.Model):
         on_delete=models.SET_NULL,
         null=True
     )
+    guest_name = models.CharField(max_length=100, blank=True)
+    guest_phone = models.CharField(max_length=20, blank=True)
+    guest_email = models.EmailField(blank=True)
+    guest_address = models.CharField(max_length=200, blank=True)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -309,13 +320,16 @@ class Order(models.Model):
             coupon = Coupon.objects.get(coupon_code=coupon_code)
 
             if not coupon.is_valid():
-                return {"error": "Invalid coupon"}
+                return {"error": "Invalid or fully used coupon"}
 
             discount = coupon.apply_discount(self.total_amount)
             self.coupon = coupon
             self.coupon_discount = discount
             self.total_amount -= discount
             self.save()
+
+            coupon.times_used += 1
+            coupon.save()
 
             return {"success": f"Coupon applied successfully! Discount: {discount}"}
 

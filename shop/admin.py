@@ -223,7 +223,7 @@ class PaymentAdmin(ModelAdmin):
 
 @admin.register(Coupon)
 class CouponAdmin(ModelAdmin):
-    list_display = ['coupon_code', 'discount_percent', 'valid_from', 'valid_to', 'usage_limit']
+    list_display = ['coupon_code', 'discount_percent', 'valid_from', 'valid_to', 'usage_limit', 'times_used']
     search_fields = ['coupon_code']
 
 

@@ -7,13 +7,19 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def send_order_confirmation_email_task(self, order_id): 
+def send_order_confirmation_email_task(self, order_id):
     from .models import Order
     from django.core.mail import EmailMultiAlternatives
     from django.conf import settings
 
     try:
         order = Order.objects.get(id=order_id)
+        recipient_email = order.user.email if order.user else order.guest_email
+        recipient_name = order.user.username if order.user else order.guest_name
+        if not recipient_email:
+            logger.warning(f"No email on file for order {order.order_number}, skipping confirmation email")
+            return
+
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
         tracking_link = f'{frontend_url}/order-confirmation?order_id={order.id}'
 
@@ -69,7 +75,7 @@ def send_order_confirmation_email_task(self, order_id):
             )
 
         text_content = (
-            f'Hi {order.user.username},\n\n'
+            f'Hi {recipient_name},\n\n'
             f'Great news! Your order has been confirmed and is now being processed.\n\n'
             f'Order Number : {order.order_number}\n'
             f'Order Date   : {order.created_at.strftime("%B %d, %Y")}\n'
@@ -102,7 +108,7 @@ def send_order_confirmation_email_task(self, order_id):
 
                 <div style="padding:32px 28px;">
                     <p style="margin:0 0 4px;color:#16a34a;font-size:13px;font-weight:700;letter-spacing:0.05em;">ORDER CONFIRMED</p>
-                    <h2 style="margin:0 0 20px;color:#0f172a;font-size:22px;font-weight:700;">Hi {order.user.username}, thanks for your order!</h2>
+                    <h2 style="margin:0 0 20px;color:#0f172a;font-size:22px;font-weight:700;">Hi {recipient_name}, thanks for your order!</h2>
                     <p style="margin:0 0 24px;color:#475569;font-size:15px;font-weight:500;line-height:1.6;">
                         Great news! Your order has been confirmed and is now being processed. We'll notify you again once it ships.
                     </p>
@@ -154,7 +160,7 @@ def send_order_confirmation_email_task(self, order_id):
             subject=f'Your Order is Confirmed - {order.order_number}',
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[order.user.email],
+            to=[recipient_email],
         )
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)

@@ -193,7 +193,8 @@ class CartSerializer(serializers.ModelSerializer):
 class CouponSerializer(serializers.ModelSerializer):
     class Meta:
         model = Coupon
-        fields = ['id', 'coupon_code', 'discount_percent', 'valid_from', 'valid_to', 'usage_limit']
+        fields = ['id', 'coupon_code', 'discount_percent', 'valid_from', 'valid_to', 'usage_limit', 'times_used']
+        read_only_fields = ['times_used']
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -236,9 +237,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'user', 'order_number', 'coupon', 'coupon_discount', 'status',
+            'id', 'user', 'order_number', 'public_token', 'coupon', 'coupon_discount', 'status',
             'shipping_address', 'shipping_address_id', 'shipping_cost',
-            'total_amount', 'created_at', 'items', 'payment', 'return_request'
+            'total_amount', 'created_at', 'items', 'payment', 'return_request', 'guest_name', 'guest_phone', 'guest_email', 'guest_address'
         ]
         read_only_fields = ['user', 'order_number', 'total_amount', 'shipping_cost', 'coupon_discount']
 

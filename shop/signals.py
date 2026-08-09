@@ -22,6 +22,31 @@ def reduce_stock(sender, instance, created, **kwargs):
             variant.save()
 
 
+# @receiver(post_save, sender=Order)
+# def notify_admin_new_order(sender, instance, created, **kwargs):
+#     if created:
+#         items_list = "\n".join(
+#             f"  - {item.variant.product.name} ({item.variant.size}/{item.variant.color}) x{item.quantity}"
+#             for item in instance.items.all()
+#         )
+#         send_mail(
+#             subject=f'🛒 New Order Received - {instance.order_number}',
+#             message=(
+#                 f'A new order has been placed on Wearify.\n\n'
+#                 f'Order Number : {instance.order_number}\n'
+#                 f'Customer     : {instance.user.username} ({instance.user.email})\n'
+#                 f'Total Amount : {instance.total_amount} BDT\n'
+#                 f'Shipping To  : {instance.shipping_address.full_address if instance.shipping_address else "N/A"}\n'
+#                 f'Phone        : {instance.shipping_address.phone if instance.shipping_address else "N/A"}\n\n'
+#                 f'Items:\n{items_list}\n\n'
+#                 f'Please call the customer to confirm, then approve this order from the admin panel.'
+#             ),
+#             from_email=settings.DEFAULT_FROM_EMAIL,
+#             recipient_list=[settings.EMAIL_HOST_USER],
+#             fail_silently=True,
+#         )
+# guest mode ar jnno 
+
 @receiver(post_save, sender=Order)
 def notify_admin_new_order(sender, instance, created, **kwargs):
     if created:
@@ -29,15 +54,20 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
             f"  - {item.variant.product.name} ({item.variant.size}/{item.variant.color}) x{item.quantity}"
             for item in instance.items.all()
         )
+        customer_name = instance.user.username if instance.user else f"{instance.guest_name} (Guest)"
+        customer_email = instance.user.email if instance.user else instance.guest_email
+        address_text = instance.shipping_address.full_address if instance.shipping_address else instance.guest_address
+        phone_text = instance.shipping_address.phone if instance.shipping_address else instance.guest_phone
+
         send_mail(
             subject=f'🛒 New Order Received - {instance.order_number}',
             message=(
                 f'A new order has been placed on Wearify.\n\n'
                 f'Order Number : {instance.order_number}\n'
-                f'Customer     : {instance.user.username} ({instance.user.email})\n'
+                f'Customer     : {customer_name} ({customer_email})\n'
                 f'Total Amount : {instance.total_amount} BDT\n'
-                f'Shipping To  : {instance.shipping_address.full_address if instance.shipping_address else "N/A"}\n'
-                f'Phone        : {instance.shipping_address.phone if instance.shipping_address else "N/A"}\n\n'
+                f'Shipping To  : {address_text or "N/A"}\n'
+                f'Phone        : {phone_text or "N/A"}\n\n'
                 f'Items:\n{items_list}\n\n'
                 f'Please call the customer to confirm, then approve this order from the admin panel.'
             ),
@@ -45,7 +75,6 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
             recipient_list=[settings.EMAIL_HOST_USER],
             fail_silently=True,
         )
-
 
 @receiver(pre_save, sender=Order)
 def capture_previous_order_status(sender, instance, **kwargs):

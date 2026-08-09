@@ -1,5 +1,5 @@
 from xml.dom import ValidationErr
-
+from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from rest_framework import serializers, viewsets, generics, status, permissions
 from rest_framework.views import APIView
@@ -177,17 +177,162 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+# class CartViewSet(viewsets.ViewSet):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def list(self, request):
+#         cart, _ = Cart.objects.get_or_create(user=request.user)
+#         serializer = CartSerializer(cart, context={'request': request})
+#         return Response(serializer.data)
+
+#     @action(detail=False, methods=['post'])
+#     def add_item(self, request):
+#         cart, _ = Cart.objects.get_or_create(user=request.user)
+#         serializer = CartItemSerializer(data=request.data, context={'request': request})
+#         serializer.is_valid(raise_exception=True)
+#         variant = serializer.validated_data['variant']
+#         quantity = serializer.validated_data.get('quantity', 1)
+
+#         item, created = CartItem.objects.get_or_create(cart=cart, variant=variant)
+#         if not created:
+#             item.quantity += quantity
+#         else:
+#             item.quantity = quantity
+#         item.save()
+
+#         return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+#     @action(detail=False, methods=['post'])
+#     def remove_item(self, request):
+#         cart, _ = Cart.objects.get_or_create(user=request.user)
+#         item_id = request.data.get('item_id')
+#         item = get_object_or_404(CartItem, id=item_id, cart=cart)
+#         item.delete()
+#         return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_200_OK)
+
+#     @action(detail=False, methods=['post'])
+#     def update_item(self, request):
+#         cart, _ = Cart.objects.get_or_create(user=request.user)
+#         item_id = request.data.get('item_id')
+#         quantity = request.data.get('quantity')
+#         item = get_object_or_404(CartItem, id=item_id, cart=cart)
+#         item.quantity = quantity
+#         item.save()
+#         return Response(CartSerializer(cart, context={'request': request}).data, status=status.HTTP_200_OK)
+
+
+# class OrderViewSet(viewsets.ModelViewSet):
+#     serializer_class = OrderSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get_queryset(self):
+#         return Order.objects.filter(user=self.request.user).order_by('-created_at')
+
+#     def create(self, request, *args, **kwargs):
+#         cart, _ = Cart.objects.get_or_create(user=request.user)
+#         item_ids = request.data.get('item_ids')
+
+#         if item_ids:
+#             items_qs = cart.items.filter(id__in=item_ids)
+#         else:
+#             items_qs = cart.items.all()
+
+#         if not items_qs.exists():
+#             logger.warning(f"Order creation failed - no items selected for user {request.user.username}")
+#             return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         for item in items_qs:
+#             if item.variant.stock_quantity < item.quantity:
+#                 logger.warning(f"Order creation failed - insufficient stock for {item.variant} (user: {request.user.username})")
+#                 return Response(
+#                     {"error": f"Insufficient stock for {item.variant}"},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#         delivery_location = request.data.get('delivery_location', 'inside_dhaka')
+#         items_total = sum(item.variant.price * item.quantity for item in items_qs)
+
+#         if items_total > 2500:
+#             shipping_cost = 0
+#         else:
+#             shipping_cost = 60 if delivery_location == 'inside_dhaka' else 130
+
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+
+#         total_amount = items_total + shipping_cost
+
+#         order = serializer.save(
+#             user=request.user,
+#             order_number=f"ORD-{Order.objects.count() + 1:06d}",
+#             total_amount=total_amount,
+#             shipping_cost=shipping_cost
+#         )
+
+#         for item in items_qs:
+#             OrderItem.objects.create(
+#                 order=order,
+#                 variant=item.variant,
+#                 quantity=item.quantity,
+#                 price_at_purchase=item.variant.price
+#             )
+
+#         items_qs.delete()
+#         logger.info(f"Order {order.order_number} created successfully by {request.user.username}")
+#         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
+#     @action(detail=True, methods=['post'])
+#     def apply_coupon(self, request, pk=None):
+#         order = self.get_object()
+#         coupon_code = request.data.get('coupon_code')
+#         result = order.apply_coupon(coupon_code)
+#         if "error" in result:
+#             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+#         return Response(result, status=status.HTTP_200_OK)
+
+#     @action(detail=True, methods=['post'])
+#     def cancel(self, request, pk=None):
+#         order = self.get_object()
+#         if order.status != 'pending':
+#             return Response({"error": "This order can no longer be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+#         order.status = 'cancelled'
+#         order.save()
+#         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+#     @action(detail=False, methods=['post'])
+#     def track(self, request):
+#         order_number = request.data.get('order_id') or request.data.get('order_number')
+#         if not order_number:
+#             return Response({"error": "order_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+#         try:
+#             order = Order.objects.get(order_number=order_number, user=request.user)
+#         except Order.DoesNotExist:
+#             return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+#         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+# guest mode ar jnno replace 
+
+
 class CartViewSet(viewsets.ViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    def _get_cart(self, request):
+        if request.user.is_authenticated:
+            cart, _ = Cart.objects.get_or_create(user=request.user)
+            return cart
+        if not request.session.session_key:
+            request.session.create()
+        cart, _ = Cart.objects.get_or_create(user=None, session_key=request.session.session_key)
+        return cart
 
     def list(self, request):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = self._get_cart(request)
         serializer = CartSerializer(cart, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def add_item(self, request):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = self._get_cart(request)
         serializer = CartItemSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         variant = serializer.validated_data['variant']
@@ -204,7 +349,7 @@ class CartViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def remove_item(self, request):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = self._get_cart(request)
         item_id = request.data.get('item_id')
         item = get_object_or_404(CartItem, id=item_id, cart=cart)
         item.delete()
@@ -212,7 +357,7 @@ class CartViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def update_item(self, request):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = self._get_cart(request)
         item_id = request.data.get('item_id')
         quantity = request.data.get('quantity')
         item = get_object_or_404(CartItem, id=item_id, cart=cart)
@@ -223,51 +368,93 @@ class CartViewSet(viewsets.ViewSet):
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user).order_by('-created_at')
+        if self.request.user.is_authenticated:
+            return Order.objects.filter(user=self.request.user).order_by('-created_at')
+        return Order.objects.none()
+
+    def get_object(self):
+        pk = self.kwargs['pk']
+        obj = get_object_or_404(Order, pk=pk)
+
+        if obj.user is not None:
+            if not self.request.user.is_authenticated or obj.user != self.request.user:
+                raise PermissionDenied("You do not have permission to view this order.")
+            return obj
+
+        # Guest order — the numeric pk alone isn't enough (it's sequential and
+        # guessable); the request must also present the matching public_token.
+        token = self.request.query_params.get('token')
+        if not token or str(obj.public_token) != token:
+            raise PermissionDenied("You do not have permission to view this order.")
+        return obj
 
     def create(self, request, *args, **kwargs):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
-        item_ids = request.data.get('item_ids')
-
-        if item_ids:
-            items_qs = cart.items.filter(id__in=item_ids)
+        if request.user.is_authenticated:
+            cart, _ = Cart.objects.get_or_create(user=request.user)
         else:
-            items_qs = cart.items.all()
+            if not request.session.session_key:
+                request.session.create()
+            cart, _ = Cart.objects.get_or_create(user=None, session_key=request.session.session_key)
+
+        item_ids = request.data.get('item_ids')
+        items_qs = cart.items.filter(id__in=item_ids) if item_ids else cart.items.all()
 
         if not items_qs.exists():
-            logger.warning(f"Order creation failed - no items selected for user {request.user.username}")
+            logger.warning("Order creation failed - no items selected")
             return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
         for item in items_qs:
             if item.variant.stock_quantity < item.quantity:
-                logger.warning(f"Order creation failed - insufficient stock for {item.variant} (user: {request.user.username})")
+                logger.warning(f"Order creation failed - insufficient stock for {item.variant}")
                 return Response(
                     {"error": f"Insufficient stock for {item.variant}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+        shipping_address_id = request.data.get('shipping_address_id')
+        guest_name = request.data.get('guest_name', '').strip()
+        guest_phone = request.data.get('guest_phone', '').strip()
+        guest_address = request.data.get('guest_address', '').strip()
+        guest_email = request.data.get('guest_email', '').strip()
+
+        if not request.user.is_authenticated:
+            if not (guest_name and guest_phone and guest_address):
+                return Response(
+                    {"error": "Name, phone number and address are required to checkout as a guest."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif not shipping_address_id:
+            return Response({"error": "Shipping address is required."}, status=status.HTTP_400_BAD_REQUEST)
+
         delivery_location = request.data.get('delivery_location', 'inside_dhaka')
         items_total = sum(item.variant.price * item.quantity for item in items_qs)
-
-        if items_total > 2500:
-            shipping_cost = 0
-        else:
-            shipping_cost = 60 if delivery_location == 'inside_dhaka' else 130
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
+        shipping_cost = 0 if items_total > 2500 else (60 if delivery_location == 'inside_dhaka' else 130)
         total_amount = items_total + shipping_cost
 
-        order = serializer.save(
-            user=request.user,
-            order_number=f"ORD-{Order.objects.count() + 1:06d}",
-            total_amount=total_amount,
-            shipping_cost=shipping_cost
-        )
+        order_kwargs = {
+            'user': request.user if request.user.is_authenticated else None,
+            'order_number': f"ORD-{Order.objects.count() + 1:06d}",
+            'total_amount': total_amount,
+            'shipping_cost': shipping_cost,
+        }
+        if request.user.is_authenticated:
+            order_kwargs['shipping_address_id'] = shipping_address_id
+        else:
+            order_kwargs.update({
+                'guest_name': guest_name,
+                'guest_phone': guest_phone,
+                'guest_address': guest_address,
+                'guest_email': guest_email,
+            })
+
+        order = Order.objects.create(**order_kwargs)
 
         for item in items_qs:
             OrderItem.objects.create(
@@ -278,7 +465,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         items_qs.delete()
-        logger.info(f"Order {order.order_number} created successfully by {request.user.username}")
+        logger.info(f"Order {order.order_number} created successfully")
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -297,6 +484,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({"error": "This order can no longer be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
         order.status = 'cancelled'
         order.save()
+        if order.coupon:
+            order.coupon.times_used = max(0, order.coupon.times_used - 1)
+            order.coupon.save()
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
@@ -309,8 +499,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
-
-
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
