@@ -15,6 +15,7 @@ class UserProfile(models.Model):
     )
     phone = models.CharField(max_length=11)
     profile_image = models.ImageField(upload_to='profiles-photos/', null=True, blank=True)
+    wishlist_share_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     def __str__(self):
         return f"This is {self.user.username}"
@@ -77,6 +78,8 @@ class Product(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
+    meta_title = models.CharField(max_length=60, blank=True)
+    meta_description = models.CharField(max_length=160, blank=True)
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
     cost_price = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
@@ -486,7 +489,7 @@ class SizeChartRow(models.Model):
         on_delete=models.CASCADE,
         related_name='rows'
     )
-    size = models.CharField(max_length=10)
+    size = models.CharField(max_length=20)
     chest = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     waist = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     hip = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)

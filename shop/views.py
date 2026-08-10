@@ -48,7 +48,7 @@ from .serializers import (
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer, ReturnRequestSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer, ReturnRequestSerializer, SharedWishlistSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -989,3 +989,15 @@ class ReturnRequestViewSet(viewsets.ModelViewSet):
         if hasattr(order, 'return_request'):
             raise serializers.ValidationError({"error": "A return request already exists for this order."})
         serializer.save()
+
+
+class SharedWishlistView(generics.ListAPIView):
+    serializer_class = SharedWishlistSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+
+    def get_queryset(self):
+        token = self.kwargs.get('token')
+        return Wishlist.objects.filter(
+            user__profile__wishlist_share_token=token
+        ).select_related('product')

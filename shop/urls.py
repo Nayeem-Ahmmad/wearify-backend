@@ -4,7 +4,7 @@ from .views import (
     RegisterView, CategoryViewSet, BrandViewSet, TagViewSet, ProductViewSet,
     AddressViewSet, UserProfileViewSet, CartViewSet,
     OrderViewSet, PaymentViewSet, ReviewViewSet, WishlistViewSet, InitiatePaymentView, PaymentSuccessView,
-    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView, NewsletterSubscribeView, ReturnRequestViewSet
+    PaymentFailView, PaymentCancelView, UpdateAccountView, ContactMessageView, ActiveFlashSaleView, StockNotificationViewSet, OrderInvoiceView, PasswordResetConfirmView, PasswordResetRequestView, NewsletterSubscribeView, ReturnRequestViewSet, SharedWishlistView
 )
 
 router = DefaultRouter()
@@ -25,6 +25,7 @@ router.register('returns', ReturnRequestViewSet, basename='return-request')
 urlpatterns = [
     path('', include(router.urls)),
     path('register/', RegisterView.as_view(), name='register'),
+    path('wishlist/shared/<uuid:token>/', SharedWishlistView.as_view(), name='shared-wishlist'),
     path('contact/', ContactMessageView.as_view(), name='contact'),
     path('flash-sale/active/', ActiveFlashSaleView.as_view(), name='active-flash-sale'),
     path('orders/<int:order_id>/invoice/', OrderInvoiceView.as_view(), name='order-invoice'),

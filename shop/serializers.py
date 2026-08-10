@@ -43,8 +43,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['id', 'user', 'phone', 'profile_image']
-        read_only_fields = ['user']
+        fields = ['id', 'user', 'phone', 'profile_image', 'wishlist_share_token']
+        read_only_fields = ['user', 'wishlist_share_token']
 
 
 class AddressSerializer(serializers.ModelSerializer):
@@ -337,3 +337,10 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
         model = ReturnRequest
         fields = ['id', 'order', 'order_number', 'reason', 'status', 'admin_note', 'created_at']
         read_only_fields = ['status', 'admin_note', 'created_at']
+
+
+class SharedWishlistSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    class Meta:
+        model = Wishlist
+        fields = ['id', 'product']
