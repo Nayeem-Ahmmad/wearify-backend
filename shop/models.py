@@ -41,6 +41,8 @@ class Address(models.Model):
 class Category(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True, blank=True)
+    meta_title = models.CharField(max_length=60, blank=True)
+    meta_description = models.CharField(max_length=160, blank=True)
     image = models.ImageField(upload_to='categories-images/', blank=True, null=True)
     parent = models.ForeignKey(
         'self',

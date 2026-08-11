@@ -60,7 +60,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug', 'parent', 'children', 'image', 'product_count']
+        fields = ['id', 'name', 'slug', 'parent', 'children', 'image', 'product_count', 'meta_title', 'meta_description']
 
     def get_children(self, obj):
         return CategorySerializer(obj.children.all(), many=True).data
@@ -146,7 +146,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'flash_sale_end','average_rating', 'review_count',
             'category', 'category_id', 'brand', 'brand_id',
             'tags', 'tag_ids', 'images', 'variants', 'size_chart',
-            'is_active', 'created_at'
+            'is_active', 'created_at', 'meta_title', 'meta_description'
         ]
 
     def get_flash_sale_end(self, obj):
