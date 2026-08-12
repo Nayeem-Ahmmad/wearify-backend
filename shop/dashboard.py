@@ -4,7 +4,7 @@ from django.db.models.functions import TruncDate
 from datetime import timedelta
 import json
 from .models import Order, ProductVariant, OrderItem, Payment, Cart
-
+from django.core.paginator import Paginator
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.db.models.functions import TruncDate, TruncMonth
@@ -90,6 +90,55 @@ def dashboard_callback(request, context):
         for item in cart.items.all()
     )
 
+    # Order status breakdown
+    status_counts = Order.objects.exclude(status='cancelled').values('status').annotate(count=Count('id'))
+    order_status_labels = [row['status'].capitalize() for row in status_counts]
+    order_status_values = [row['count'] for row in status_counts]
+
+    # Category-wise sales
+    category_sales = (
+        OrderItem.objects.filter(order__in=orders_qs)
+        .values('variant__product__category__name')
+        .annotate(total=Sum('price_at_purchase'))
+        .order_by('-total')[:8]
+    )
+    category_labels = [row['variant__product__category__name'] or 'Uncategorized' for row in category_sales]
+    category_values = [float(row['total'] or 0) for row in category_sales]
+
+    # Revenue vs profit trend (reuses same 30-day window)
+    daily_profit_items = (
+        OrderItem.objects.filter(order__in=profit_orders_qs, order__created_at__gte=last_30_days)
+        .select_related('variant__product')
+        .annotate(day=TruncDate('order__created_at'))
+    )
+    profit_by_day = {}
+    for item in daily_profit_items:
+        if not item.variant:
+            continue
+        day = item.day
+        profit = (item.price_at_purchase - item.variant.product.cost_price) * item.quantity
+        profit_by_day[day] = profit_by_day.get(day, 0) + profit
+    chart_profit_values = []
+    for i in range(29, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        chart_profit_values.append(float(profit_by_day.get(day, 0)))
+
+    # Top customers by spend
+    top_customers = (
+        orders_qs.values('user__username')
+        .annotate(total_spent=Sum('total_amount'), order_count=Count('id'))
+        .order_by('-total_spent')[:5]
+    )
+
+    # Review rating overview
+    from .models import Review
+    rating_counts = Review.objects.values('rating').annotate(count=Count('id')).order_by('rating')
+    rating_by_star = {row['rating']: row['count'] for row in rating_counts}
+    review_labels = [f"{i} ★" for i in range(1, 6)]
+    review_values = [rating_by_star.get(i, 0) for i in range(1, 6)]
+    total_reviews = sum(review_values)
+    avg_rating = (sum(i * review_by_star for i, review_by_star in zip(range(1, 6), review_values)) / total_reviews) if total_reviews else 0
+
     context.update({
         "kpi": [
             {"title": "Total Sales", "metric": f"৳{total_sales:,.0f}", "footer": "All confirmed orders"},
@@ -113,6 +162,16 @@ def dashboard_callback(request, context):
         "payment_failed": payment_breakdown.get('failed', 0),
         "abandoned_cart_count": abandoned_cart_count,
         "abandoned_cart_value": f"৳{abandoned_cart_value:,.0f}",
+        "order_status_labels": json.dumps(order_status_labels),
+        "order_status_values": json.dumps(order_status_values),
+        "category_labels": json.dumps(category_labels),
+        "category_values": json.dumps(category_values),
+        "chart_profit_values": json.dumps(chart_profit_values),
+        "top_customers": top_customers,
+        "review_labels": json.dumps(review_labels),
+        "review_values": json.dumps(review_values),
+        "avg_rating": f"{avg_rating:.1f}",
+        "total_reviews": total_reviews,
     })
 
     return context
@@ -158,3 +217,31 @@ def monthly_sales_report(request):
         })
 
     return render(request, 'admin/monthly_sales.html', {'rows': rows})
+
+
+@staff_member_required
+def orders_report(request):
+    orders = Order.objects.exclude(status='cancelled').select_related('user').order_by('-created_at')
+    paginator = Paginator(orders, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin/orders_report.html', {'page_obj': page_obj})
+
+
+@staff_member_required
+def low_stock_report(request):
+    variants = ProductVariant.objects.filter(stock_quantity__lte=10).select_related('product').order_by('stock_quantity')
+    paginator = Paginator(variants, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin/low_stock_report.html', {'page_obj': page_obj})
+
+
+@staff_member_required
+def top_products_report(request):
+    products = (
+        OrderItem.objects.values('variant__product__name')
+        .annotate(total_sold=Sum('quantity'))
+        .order_by('-total_sold')
+    )
+    paginator = Paginator(products, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin/top_products_report.html', {'page_obj': page_obj})

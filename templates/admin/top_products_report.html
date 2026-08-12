@@ -1,0 +1,35 @@
+{% extends "unfold/layouts/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Top Selling Products</h2>
+        <a href="/admin/" class="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 dark:text-gray-400">
+                    <th class="pb-2">#</th>
+                    <th class="pb-2">Product</th>
+                    <th class="pb-2 text-right">Units Sold</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in page_obj %}
+                <tr class="border-t border-gray-100 dark:border-gray-800">
+                    <td class="py-2 text-gray-400">{{ forloop.counter0|add:page_obj.start_index }}</td>
+                    <td class="py-2">{{ p.variant__product__name|default:"—"|truncatechars:50 }}</td>
+                    <td class="py-2 text-right font-medium">{{ p.total_sold }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="py-4 text-center text-gray-400">No sales data yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "admin/_pagination.html" %}
+    </div>
+</div>
+{% endblock %}

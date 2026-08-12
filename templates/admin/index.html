@@ -7,7 +7,11 @@
 
     <div class="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3 lg:grid-cols-5">
         {% for item in kpi %}
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div class="p-6 bg-white border-l-4 border-t border-r border-b rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800
+            {% if item.title == 'Total Sales' %}border-l-blue-500
+            {% elif item.title == 'Total Profit' %}border-l-green-500
+            {% elif item.title == 'Pending Orders' %}border-l-amber-500
+            {% else %}border-l-gray-300 dark:border-l-gray-700{% endif %}">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ item.title }}</p>
             <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ item.metric }}</p>
             <p class="mt-1 text-xs text-gray-400">{{ item.footer }}</p>
@@ -20,14 +24,14 @@
         {% endfor %}
     </div>
 
-    <div class="p-6 mb-4 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+    <div class="p-6 mb-4 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
         <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Sales Trend (Last 30 Days)</h3>
         <canvas id="salesTrendChart" height="80"></canvas>
     </div>
 
     <div class="grid grid-cols-1 gap-4 mb-4 lg:grid-cols-3">
 
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
             <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Customers (30 days)</h3>
             <div class="flex items-end gap-6">
                 <div>
@@ -41,7 +45,7 @@
             </div>
         </div>
 
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
             <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Payment Status</h3>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
@@ -59,7 +63,7 @@
             </div>
         </div>
 
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
             <h3 class="mb-1 font-semibold text-gray-900 dark:text-white">Abandoned Carts</h3>
             <p class="mb-4 text-xs text-gray-400">Items sitting in cart, not yet ordered</p>
             <p class="text-2xl font-bold text-orange-500">{{ abandoned_cart_count }}</p>
@@ -68,10 +72,27 @@
 
     </div>
 
+    <div class="grid grid-cols-1 gap-4 mb-4 lg:grid-cols-2">
+
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Order Status Breakdown</h3>
+            <canvas id="orderStatusChart" height="180"></canvas>
+        </div>
+
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Category-wise Sales</h3>
+            <canvas id="categorySalesChart" height="180"></canvas>
+        </div>
+
+    </div>
+
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
-            <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Recent Orders</h3>
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-gray-900 dark:text-white">Recent Orders</h3>
+                <a href="/admin/orders-report/" class="text-xs font-medium text-blue-600 hover:underline">View all →</a>
+            </div>
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-gray-500 dark:text-gray-400">
@@ -89,8 +110,17 @@
                                 {{ order.order_number }}
                             </a>
                         </td>
-                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ order.user.username }}</td>
-                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ order.status }}</td>
+                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ order.user.username|default:"—" }}</td>
+                        <td class="py-2">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if order.status == 'delivered' %}bg-green-100 text-green-700
+                                {% elif order.status == 'pending' %}bg-amber-100 text-amber-700
+                                {% elif order.status == 'cancelled' %}bg-red-100 text-red-700
+                                {% elif order.status == 'shipped' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ order.status }}
+                            </span>
+                        </td>
                         <td class="py-2 text-right font-medium">৳{{ order.total_amount }}</td>
                     </tr>
                     {% empty %}
@@ -100,8 +130,11 @@
             </table>
         </div>
 
-        <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
-            <h3 class="mb-1 font-semibold text-gray-900 dark:text-white">Low Stock Alert</h3>
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="font-semibold text-gray-900 dark:text-white">Low Stock Alert</h3>
+                <a href="/admin/low-stock-report/" class="text-xs font-medium text-blue-600 hover:underline">View all →</a>
+            </div>
             <p class="mb-4 text-xs text-gray-400">{{ out_of_stock_count }} variant(s) completely out of stock</p>
             <table class="w-full text-sm">
                 <thead>
@@ -131,8 +164,11 @@
 
     </div>
 
-    <div class="p-6 mt-4 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
-        <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Top Selling Products</h3>
+    <div class="p-6 mt-4 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-900 dark:text-white">Top Selling Products</h3>
+            <a href="/admin/top-products-report/" class="text-xs font-medium text-blue-600 hover:underline">View all →</a>
+        </div>
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-left text-gray-500 dark:text-gray-400">
@@ -143,7 +179,7 @@
             <tbody>
                 {% for p in top_products %}
                 <tr class="border-t border-gray-100 dark:border-gray-800">
-                    <td class="py-2">{{ p.variant__product__name|truncatechars:50 }}</td>
+                    <td class="py-2">{{ p.variant__product__name|default:"—"|truncatechars:50 }}</td>
                     <td class="py-2 text-right font-medium">{{ p.total_sold }}</td>
                 </tr>
                 {% empty %}
@@ -153,10 +189,46 @@
         </table>
     </div>
 
+    <div class="grid grid-cols-1 gap-4 mt-4 lg:grid-cols-2">
+
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <h3 class="mb-4 font-semibold text-gray-900 dark:text-white">Top Customers</h3>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 dark:text-gray-400">
+                        <th class="pb-2">Customer</th>
+                        <th class="pb-2">Orders</th>
+                        <th class="pb-2 text-right">Total Spent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in top_customers %}
+                    <tr class="border-t border-gray-100 dark:border-gray-800">
+                        <td class="py-2 text-gray-600 dark:text-gray-300">{{ c.user__username|default:"—" }}</td>
+                        <td class="py-2">{{ c.order_count }}</td>
+                        <td class="py-2 text-right font-medium">৳{{ c.total_spent|floatformat:0 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="py-4 text-center text-gray-400">No customer data yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="p-6 bg-white border rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="font-semibold text-gray-900 dark:text-white">Review Ratings</h3>
+                <span class="text-xs text-gray-400">{{ avg_rating }} ★ avg ({{ total_reviews }} reviews)</span>
+            </div>
+            <canvas id="reviewRatingChart" height="180"></canvas>
+        </div>
+
+    </div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script>
+{% comment %} <script>
     const ctx = document.getElementById('salesTrendChart');
     new Chart(ctx, {
         type: 'line',
@@ -178,6 +250,91 @@
             scales: {
                 y: { beginAtZero: true },
             },
+        }
+    });
+</script> {% endcomment %}
+<script>
+    const ctx = document.getElementById('salesTrendChart');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [
+                {
+                    label: 'Revenue (৳)',
+                    data: {{ chart_values|safe }},
+                    borderColor: '#2563EB',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                },
+                {
+                    label: 'Profit (৳)',
+                    data: {{ chart_profit_values|safe }},
+                    borderColor: '#16A34A',
+                    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+                y: { beginAtZero: true },
+            },
+        }
+    });
+
+    new Chart(document.getElementById('orderStatusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ order_status_labels|safe }},
+            datasets: [{
+                data: {{ order_status_values|safe }},
+                backgroundColor: ['#2563EB', '#16A34A', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4'],
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+
+    new Chart(document.getElementById('categorySalesChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ category_labels|safe }},
+            datasets: [{
+                label: 'Sales (৳)',
+                data: {{ category_values|safe }},
+                backgroundColor: '#2563EB',
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
+        }
+    });
+
+    new Chart(document.getElementById('reviewRatingChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ review_labels|safe }},
+            datasets: [{
+                label: 'Reviews',
+                data: {{ review_values|safe }},
+                backgroundColor: '#F59E0B',
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } },
         }
     });
 </script>

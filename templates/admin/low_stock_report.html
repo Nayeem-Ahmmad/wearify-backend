@@ -1,0 +1,42 @@
+{% extends "unfold/layouts/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Low Stock Variants</h2>
+        <a href="/admin/" class="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="p-6 bg-white border rounded-md shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-gray-500 dark:text-gray-400">
+                    <th class="pb-2">Product</th>
+                    <th class="pb-2">Variant</th>
+                    <th class="pb-2 text-right">Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in page_obj %}
+                <tr class="border-t border-gray-100 dark:border-gray-800">
+                    <td class="py-2">
+                        <a href="/admin/shop/product/{{ v.product.id }}/change/" class="text-blue-600 hover:underline">
+                            {{ v.product.name|truncatechars:40 }}
+                        </a>
+                    </td>
+                    <td class="py-2 text-gray-600 dark:text-gray-300">{{ v.size }}/{{ v.color }}</td>
+                    <td class="py-2 text-right font-medium
+                        {% if v.stock_quantity == 0 %}text-red-500{% else %}text-orange-500{% endif %}">
+                        {{ v.stock_quantity }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="py-4 text-center text-gray-400">All stock levels healthy.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% include "admin/_pagination.html" %}
+    </div>
+</div>
+{% endblock %}

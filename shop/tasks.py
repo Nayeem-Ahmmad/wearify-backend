@@ -306,9 +306,14 @@ def send_review_reminder_email_task(order_id):
         return
 
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    valid_items = [item for item in items if item.variant and item.variant.product]
+
+    if not valid_items:
+        return
+
     product_lines = "\n".join(
         f"  - {item.variant.product.name}: {frontend_url}/products/{item.variant.product.slug}#review"
-        for item in items
+        for item in valid_items
     )
 
     send_mail(
