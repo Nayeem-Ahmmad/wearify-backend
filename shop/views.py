@@ -30,6 +30,7 @@ from reportlab.pdfgen import canvas
 
 
 import logging
+from django.db import transaction
 logger = logging.getLogger(__name__)
 from sslcommerz_lib import SSLCOMMERZ, sslcommerz
 from django.conf import settings
@@ -438,12 +439,44 @@ class OrderViewSet(viewsets.ModelViewSet):
         shipping_cost = 0 if items_total > 2500 else (60 if delivery_location == 'inside_dhaka' else 130)
         total_amount = items_total + shipping_cost
 
+        # Validate the coupon BEFORE creating the order or touching the cart,
+        # so an invalid/expired code fails fast and leaves the cart untouched.
+        coupon_code = request.data.get('coupon_code', '').strip()
+        coupon = None
+        coupon_discount = 0
+        if coupon_code:
+            try:
+                coupon = Coupon.objects.get(coupon_code=coupon_code)
+            except Coupon.DoesNotExist:
+                return Response({"error": "Coupon not found!"}, status=status.HTTP_400_BAD_REQUEST)
+            if not coupon.is_valid():
+                return Response({"error": "Invalid or fully used coupon"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # One use per user (logged-in) / per guest phone number
+            if request.user.is_authenticated:
+                already_used = Order.objects.filter(
+                    coupon=coupon, user=request.user
+                ).exclude(status='cancelled').exists()
+            else:
+                already_used = Order.objects.filter(
+                    coupon=coupon, guest_phone=guest_phone
+                ).exclude(status='cancelled').exists() if guest_phone else False
+
+            if already_used:
+                return Response({"error": "You have already used this coupon"}, status=status.HTTP_400_BAD_REQUEST)
+
+            coupon_discount = coupon.apply_discount(items_total)
+            total_amount -= coupon_discount
+
         order_kwargs = {
             'user': request.user if request.user.is_authenticated else None,
             'order_number': f"ORD-{Order.objects.count() + 1:06d}",
             'total_amount': total_amount,
             'shipping_cost': shipping_cost,
         }
+        if coupon:
+            order_kwargs['coupon'] = coupon
+            order_kwargs['coupon_discount'] = coupon_discount
         if request.user.is_authenticated:
             order_kwargs['shipping_address_id'] = shipping_address_id
         else:
@@ -454,17 +487,25 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'guest_email': guest_email,
             })
 
-        order = Order.objects.create(**order_kwargs)
+        # Everything below must succeed together — order + items + coupon usage
+        # + cart clearing — or none of it should be saved.
+        with transaction.atomic():
+            order = Order.objects.create(**order_kwargs)
 
-        for item in items_qs:
-            OrderItem.objects.create(
-                order=order,
-                variant=item.variant,
-                quantity=item.quantity,
-                price_at_purchase=item.variant.price
-            )
+            for item in items_qs:
+                OrderItem.objects.create(
+                    order=order,
+                    variant=item.variant,
+                    quantity=item.quantity,
+                    price_at_purchase=item.variant.price
+                )
 
-        items_qs.delete()
+            if coupon:
+                coupon.times_used += 1
+                coupon.save()
+
+            items_qs.delete()
+
         logger.info(f"Order {order.order_number} created successfully")
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
