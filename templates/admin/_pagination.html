@@ -5,10 +5,10 @@
     </p>
     <div class="flex gap-2">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 border rounded-md hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition">Previous</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="px-3 py-1 border rounded-md hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition">Previous</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 border rounded-md hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition">Next</a>
+        <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="px-3 py-1 border rounded-md hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition">Next</a>
         {% endif %}
     </div>
 </div>

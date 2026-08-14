@@ -4,13 +4,61 @@
 
 {% block content %}
 <div class="px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+            <a href="?days=7" class="px-3 py-1.5 text-xs font-medium rounded-md border transition
+                {% if selected_days == 7 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-300{% endif %}">7 Days</a>
+            <a href="?days=30" class="px-3 py-1.5 text-xs font-medium rounded-md border transition
+                {% if selected_days == 30 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-300{% endif %}">30 Days</a>
+            <a href="?days=90" class="px-3 py-1.5 text-xs font-medium rounded-md border transition
+                {% if selected_days == 90 %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-300{% endif %}">90 Days</a>
+        </div>
+        <button onclick="location.reload()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition dark:bg-gray-900 dark:border-gray-800 dark:text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+        </button>
+    </div>
 
-    <div class="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3 lg:grid-cols-5">
+    <div class="p-6 mb-6 rounded-md shadow-sm" style="background: linear-gradient(to right, #2563EB, #4F46E5);">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold" style="color: #ffffff;">Today's Summary</h3>
+            <a href="/admin/daily-sales/" class="text-xs hover:underline" style="color: #DBEAFE;">
+                {% now "F d, Y" %} · View Daily Report →
+            </a>
+        </div>
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div>
+                <p class="text-xs" style="color: #DBEAFE;">Orders Today</p>
+                <p class="mt-1 text-2xl font-bold" style="color: #ffffff;">{{ today_order_count }}</p>
+            </div>
+            <div>
+                <p class="text-xs" style="color: #DBEAFE;">Sales Today</p>
+                <p class="mt-1 text-2xl font-bold" style="color: #ffffff;">{{ today_sales }}</p>
+            </div>
+            <div>
+                <p class="text-xs" style="color: #DBEAFE;">Profit Today</p>
+                <p class="mt-1 text-2xl font-bold" style="color: #ffffff;">{{ today_profit }}</p>
+            </div>
+            <div>
+                <p class="text-xs" style="color: #DBEAFE;">Avg. Order Value</p>
+                <p class="mt-1 text-2xl font-bold" style="color: #ffffff;">{{ today_aov }}</p>
+            </div>
+            <div>
+                <p class="text-xs" style="color: #DBEAFE;">Pending Today</p>
+                <p class="mt-1 text-2xl font-bold" style="color: #ffffff;">{{ today_pending_count }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
         {% for item in kpi %}
         <div class="p-6 bg-white border-l-4 border-t border-r border-b rounded-md shadow-sm transition hover:shadow-md dark:bg-gray-900 dark:border-gray-800
             {% if item.title == 'Total Sales' %}border-l-blue-500
             {% elif item.title == 'Total Profit' %}border-l-green-500
             {% elif item.title == 'Pending Orders' %}border-l-amber-500
+            {% elif item.title == 'Cancellation Rate' %}border-l-red-500
             {% else %}border-l-gray-300 dark:border-l-gray-700{% endif %}">
             <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ item.title }}</p>
             <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{{ item.metric }}</p>
@@ -18,6 +66,11 @@
             {% if item.title == "Total Sales" %}
             <a href="/admin/monthly-sales/" class="inline-block mt-5 text-xs font-medium text-blue-600 hover:underline">
                 View Monthly Breakdown →
+            </a>
+            {% endif %}
+            {% if item.title == "Pending Orders" %}
+            <a href="/admin/orders-report/?status=pending" class="inline-block mt-5 text-xs font-medium text-blue-600 hover:underline">
+                View Pending Orders →
             </a>
             {% endif %}
         </div>
@@ -228,31 +281,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-{% comment %} <script>
-    const ctx = document.getElementById('salesTrendChart');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ chart_labels|safe }},
-            datasets: [{
-                label: 'Daily Sales (৳)',
-                data: {{ chart_values|safe }},
-                borderColor: '#2563EB',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true },
-            },
-        }
-    });
-</script> {% endcomment %}
 <script>
     const ctx = document.getElementById('salesTrendChart');
     new Chart(ctx, {
@@ -268,6 +296,7 @@
                     fill: true,
                     tension: 0.3,
                     pointRadius: 2,
+                    yAxisID: 'y',
                 },
                 {
                     label: 'Profit (৳)',
@@ -277,18 +306,48 @@
                     fill: true,
                     tension: 0.3,
                     pointRadius: 2,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'Orders',
+                    data: {{ chart_order_counts|safe }},
+                    borderColor: '#F59E0B',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    borderDash: [4, 3],
+                    yAxisID: 'y1',
                 }
             ]
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: true } },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: { usePointStyle: true, pointStyle: 'line', padding: 16 },
+                }
+            },
             scales: {
-                y: { beginAtZero: true },
+                y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Sales / Profit (৳)' } },
+                y1: {
+                    beginAtZero: true,
+                    max: 30,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Orders' },
+                    ticks: { stepSize: 5 },
+                },
             },
         }
     });
+</script>
 
+
+
+<script>
     new Chart(document.getElementById('orderStatusChart'), {
         type: 'doughnut',
         data: {

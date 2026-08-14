@@ -11,8 +11,16 @@ from django.db.models.functions import TruncDate, TruncMonth
 
 
 def dashboard_callback(request, context):
+    try:
+        selected_days = int(request.GET.get('days', 30))
+    except (TypeError, ValueError):
+        selected_days = 30
+    if selected_days not in (7, 30, 90):
+        selected_days = 30
+
     now = timezone.now()
-    last_30_days = now - timedelta(days=30)
+    last_30_days = now - timedelta(days=selected_days)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     orders_qs = Order.objects.exclude(status='cancelled')
 
@@ -41,6 +49,22 @@ def dashboard_callback(request, context):
         for item in recent_profit_items if item.variant
     )
 
+    # Today's summary
+    today_orders_qs = orders_qs.filter(created_at__gte=today_start)
+    today_order_count = today_orders_qs.count()
+    today_sales = sum(o.total_amount for o in today_orders_qs)
+    today_aov = (today_sales / today_order_count) if today_order_count else 0
+
+    today_profit_items = OrderItem.objects.filter(
+        order__in=profit_orders_qs, order__created_at__gte=today_start
+    ).select_related('variant__product')
+    today_profit = sum(
+        (item.price_at_purchase - item.variant.product.cost_price) * item.quantity
+        for item in today_profit_items if item.variant
+    )
+
+    today_pending_count = Order.objects.filter(status='pending', created_at__gte=today_start).count()
+
     recent_orders = Order.objects.select_related('user').order_by('-created_at')[:8]
 
     low_stock_variants = ProductVariant.objects.filter(
@@ -59,15 +83,17 @@ def dashboard_callback(request, context):
         orders_qs.filter(created_at__gte=last_30_days)
         .annotate(day=TruncDate('created_at'))
         .values('day')
-        .annotate(total=Sum('total_amount'))
+        .annotate(total=Sum('total_amount'), order_count=Count('id'))
         .order_by('day')
     )
     sales_by_day = {row['day']: float(row['total']) for row in daily_sales}
-    chart_labels, chart_values = [], []
-    for i in range(29, -1, -1):
+    orders_by_day = {row['day']: row['order_count'] for row in daily_sales}
+    chart_labels, chart_values, chart_order_counts = [], [], []
+    for i in range(selected_days - 1, -1, -1):
         day = (now - timedelta(days=i)).date()
         chart_labels.append(day.strftime('%b %d'))
         chart_values.append(sales_by_day.get(day, 0))
+        chart_order_counts.append(orders_by_day.get(day, 0))
 
     recent_order_user_ids = orders_qs.filter(created_at__gte=last_30_days).values_list('user_id', flat=True).distinct()
     new_customers = 0
@@ -119,7 +145,7 @@ def dashboard_callback(request, context):
         profit = (item.price_at_purchase - item.variant.product.cost_price) * item.quantity
         profit_by_day[day] = profit_by_day.get(day, 0) + profit
     chart_profit_values = []
-    for i in range(29, -1, -1):
+    for i in range(selected_days - 1, -1, -1):
         day = (now - timedelta(days=i)).date()
         chart_profit_values.append(float(profit_by_day.get(day, 0)))
 
@@ -139,6 +165,10 @@ def dashboard_callback(request, context):
     total_reviews = sum(review_values)
     avg_rating = (sum(i * review_by_star for i, review_by_star in zip(range(1, 6), review_values)) / total_reviews) if total_reviews else 0
 
+    total_all_orders_count = Order.objects.count()
+    cancelled_count = Order.objects.filter(status='cancelled').count()
+    cancellation_rate = (cancelled_count / total_all_orders_count * 100) if total_all_orders_count else 0
+
     context.update({
         "kpi": [
             {"title": "Total Sales", "metric": f"৳{total_sales:,.0f}", "footer": "All confirmed orders"},
@@ -146,8 +176,9 @@ def dashboard_callback(request, context):
             {"title": "Total Orders", "metric": total_orders, "footer": "All time"},
             {"title": "Avg. Order Value", "metric": f"৳{aov:,.0f}", "footer": "Per order"},
             {"title": "Pending Orders", "metric": pending_orders, "footer": "Awaiting confirmation"},
-            {"title": "Sales (30 days)", "metric": f"৳{recent_sales:,.0f}", "footer": "Last 30 days"},
-            {"title": "Profit (30 days)", "metric": f"৳{recent_profit:,.0f}", "footer": "Last 30 days"},
+            {"title": f"Sales ({selected_days} days)", "metric": f"৳{recent_sales:,.0f}", "footer": f"Last {selected_days} days"},
+            {"title": f"Profit ({selected_days} days)", "metric": f"৳{recent_profit:,.0f}", "footer": f"Last {selected_days} days"},
+            {"title": "Cancellation Rate", "metric": f"{cancellation_rate:.1f}%", "footer": f"{cancelled_count} of {total_all_orders_count} orders"},
         ],
         "recent_orders": recent_orders,
         "low_stock_variants": low_stock_variants,
@@ -155,6 +186,7 @@ def dashboard_callback(request, context):
         "top_products": top_products,
         "chart_labels": json.dumps(chart_labels),
         "chart_values": json.dumps(chart_values),
+        "chart_order_counts": json.dumps(chart_order_counts),
         "new_customers": new_customers,
         "returning_customers": returning_customers,
         "payment_paid": payment_breakdown.get('paid', 0),
@@ -172,6 +204,12 @@ def dashboard_callback(request, context):
         "review_values": json.dumps(review_values),
         "avg_rating": f"{avg_rating:.1f}",
         "total_reviews": total_reviews,
+        "selected_days": selected_days,
+        "today_order_count": today_order_count,
+        "today_sales": f"৳{today_sales:,.0f}",
+        "today_profit": f"৳{today_profit:,.0f}",
+        "today_aov": f"৳{today_aov:,.0f}",
+        "today_pending_count": today_pending_count,
     })
 
     return context
@@ -222,9 +260,12 @@ def monthly_sales_report(request):
 @staff_member_required
 def orders_report(request):
     orders = Order.objects.exclude(status='cancelled').select_related('user').order_by('-created_at')
+    status_filter = request.GET.get('status')
+    if status_filter:
+        orders = orders.filter(status=status_filter)
     paginator = Paginator(orders, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'admin/orders_report.html', {'page_obj': page_obj})
+    return render(request, 'admin/orders_report.html', {'page_obj': page_obj, 'status_filter': status_filter})
 
 
 @staff_member_required
@@ -245,3 +286,48 @@ def top_products_report(request):
     paginator = Paginator(products, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'admin/top_products_report.html', {'page_obj': page_obj})
+
+
+@staff_member_required
+def daily_sales_report(request):
+    orders_qs = Order.objects.exclude(status='cancelled')
+
+    daily_orders = (
+        orders_qs
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(total_sales=Sum('total_amount'), order_count=Count('id'))
+        .order_by('-day')
+    )
+
+    profit_orders_qs = Order.objects.exclude(status__in=['cancelled', 'pending'])
+    profit_items = (
+        OrderItem.objects.filter(order__in=profit_orders_qs)
+        .annotate(day=TruncDate('order__created_at'))
+        .select_related('variant__product')
+    )
+
+    profit_by_day = {}
+    for item in profit_items:
+        if not item.variant:
+            continue
+        profit = (item.price_at_purchase - item.variant.product.cost_price) * item.quantity
+        profit_by_day[item.day] = profit_by_day.get(item.day, 0) + profit
+
+    rows = []
+    for row in daily_orders:
+        day = row['day']
+        total_sales = row['total_sales'] or 0
+        order_count = row['order_count']
+        avg_order = (total_sales / order_count) if order_count else 0
+        rows.append({
+            'day_label': day.strftime('%B %d, %Y'),
+            'total_sales': f"৳{total_sales:,.0f}",
+            'profit': f"৳{profit_by_day.get(day, 0):,.0f}",
+            'order_count': order_count,
+            'avg_order': f"৳{avg_order:,.0f}",
+        })
+
+    paginator = Paginator(rows, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'admin/daily_sales.html', {'page_obj': page_obj})

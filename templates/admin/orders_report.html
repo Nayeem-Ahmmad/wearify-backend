@@ -4,7 +4,9 @@
 {% block content %}
 <div class="px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">All Orders</h2>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+            {% if status_filter %}{{ status_filter|capfirst }} Orders{% else %}All Orders{% endif %}
+        </h2>
         <a href="/admin/" class="text-sm text-blue-600 hover:underline">&larr; Back to Dashboard</a>
     </div>
 

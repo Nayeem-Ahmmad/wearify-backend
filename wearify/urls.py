@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from shop.dashboard import monthly_sales_report, orders_report, low_stock_report, top_products_report
+from shop.dashboard import monthly_sales_report, orders_report, low_stock_report, top_products_report, daily_sales_report
 
 
 urlpatterns = [
@@ -12,6 +12,7 @@ urlpatterns = [
     path('admin/orders-report/', orders_report, name='orders-report'),
     path('admin/low-stock-report/', low_stock_report, name='low-stock-report'),
     path('admin/top-products-report/', top_products_report, name='top-products-report'),
+    path('admin/daily-sales/', daily_sales_report, name='daily-sales-report'),
     path('admin/', admin.site.urls),
     path('api/shop/', include('shop.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name = 'token_obtain_pair'),
