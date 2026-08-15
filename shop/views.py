@@ -489,6 +489,8 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         # Everything below must succeed together — order + items + coupon usage
         # + cart clearing — or none of it should be saved.
+        payment_method = request.data.get('payment_method', 'cod')
+
         with transaction.atomic():
             order = Order.objects.create(**order_kwargs)
 
@@ -499,6 +501,13 @@ class OrderViewSet(viewsets.ModelViewSet):
                     quantity=item.quantity,
                     price_at_purchase=item.variant.price
                 )
+
+            Payment.objects.create(
+                order=order,
+                method='cod' if payment_method == 'cod' else payment_method,
+                status='pending',
+                transaction_id=order.order_number
+            )
 
             if coupon:
                 coupon.times_used += 1
@@ -627,7 +636,7 @@ class InitiatePaymentView(generics.GenericAPIView):
         return get_object_or_404(Order, id=order_id, user=user)
 
     def _validate_order_payable(self, order):
-        if order.status in ['paid', 'shipped', 'delivered']:
+        if order.status in ['confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered']:
             return Response(
                 {"error": "This order has already been processed."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -766,7 +775,7 @@ class PaymentSuccessView(APIView):
         from django.utils.timezone import now
         try:
             order = Order.objects.get(id=order_id)
-            order.status = 'paid'
+            order.status = 'confirmed'
             order.save()
 
             payment = Payment.objects.filter(order=order).first()

@@ -13,7 +13,7 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='profile'
     )
-    phone = models.CharField(max_length=11)
+    phone = models.CharField(max_length=11, unique=True, null=True, blank=True)
     profile_image = models.ImageField(upload_to='profiles-photos/', null=True, blank=True)
     wishlist_share_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
