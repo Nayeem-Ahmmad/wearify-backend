@@ -172,6 +172,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'shop.middleware.MaintenanceModeMiddleware', # for maintenance model 
 ]
 
 ROOT_URLCONF = 'wearify.urls'

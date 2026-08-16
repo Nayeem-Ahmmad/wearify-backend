@@ -5,6 +5,28 @@ from django.utils.timezone import now
 from django.utils import timezone
 import uuid
 
+#----------------------- maintenance model ---------------------------------
+class SiteSettings(models.Model):
+    maintenance_mode = models.BooleanField(default=False)
+    maintenance_message = models.TextField(
+        default="We're currently performing scheduled maintenance. We'll be back shortly."
+    )
+    class Meta:
+        verbose_name = "Site Settings"
+        verbose_name_plural = "Site Settings"
+
+    def __str__(self):
+        return "Site Settings"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
 # --------------------------- User Side  ---------------------------------------------------------
 
 class UserProfile(models.Model):

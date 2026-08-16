@@ -22,6 +22,17 @@ from .models import (
 from .tasks import send_order_confirmation_email_task
 from .tasks import send_flash_sale_email_task
 
+#------------------- Maintenance mode -------------------------------
+from .models import SiteSettings
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(ModelAdmin):
+    list_display = ['maintenance_mode']
+
+    def has_add_permission(self, request):
+        return not SiteSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 class ProductImageInline(TabularInline):
     model = ProductImage
