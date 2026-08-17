@@ -4,6 +4,7 @@ from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils import timezone
 import uuid
+from cloudinary.models import CloudinaryField
 
 #----------------------- maintenance model ---------------------------------
 class SiteSettings(models.Model):
@@ -184,7 +185,11 @@ class ProductImage(models.Model):
         on_delete=models.CASCADE,
         related_name='images'
     )
-    image = models.ImageField(upload_to='products-images/')
+    image = CloudinaryField(
+        'Image',
+        folder='products-images/',
+        transformation={'width': 800, 'height': 800, 'crop': 'limit'}
+    )
     color = models.CharField(
         max_length=30, blank=True,
         help_text="Which color this photo shows (must match a variant's color exactly, e.g. 'Black'). Leave empty for a general/default photo."

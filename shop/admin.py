@@ -13,6 +13,8 @@ import io
 from django.http import HttpResponse
 from django.urls import path
 from django.shortcuts import redirect, render
+from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
@@ -34,10 +36,25 @@ class SiteSettingsAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-class ProductImageInline(TabularInline):
+# class ProductImageInline(TabularInline):
+#     model = ProductImage
+#     extra = 1
+#     fields = ['image', 'color']
+
+class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 1
-    fields = ['image', 'color']
+    fields = ['image', 'color', 'image_preview']
+    readonly_fields = ['image_preview']
+    
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html(
+                '<img src="{}" width="100" height="100" style="object-fit: cover; border-radius: 8px;" />',
+                obj.image.url
+            )
+        return "No Image"
+    image_preview.short_description = 'Preview'
 
 
 class ProductVariantInline(TabularInline):
@@ -48,7 +65,7 @@ class ProductVariantInline(TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ['name', 'category', 'brand', 'base_price', 'cost_price', 'profit_display', 'is_active', 'created_at']
+    list_display = ['name', 'category', 'brand', 'base_price', 'cost_price', 'profit_display', 'is_active', 'first_image_preview', 'created_at']
     list_filter = ['is_active', 'category', 'brand']
     search_fields = ['name', 'slug']
     prepopulated_fields = {'slug': ('name',)}
@@ -61,6 +78,16 @@ class ProductAdmin(ModelAdmin):
     def profit_display(self, obj):
         return f"৳{obj.profit_per_unit:,.2f} ({obj.profit_margin_percent}%)"
     profit_display.short_description = "Profit / Margin"
+
+    def first_image_preview(self, obj):
+        first_image = obj.images.first()
+        if first_image and first_image.image:
+            return format_html(
+                '<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 8px;" />',
+                first_image.image.url
+            )
+        return "No Image"
+    first_image_preview.short_description = 'Image'
 
     def get_urls(self):
         urls = super().get_urls()

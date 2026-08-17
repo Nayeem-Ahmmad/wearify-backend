@@ -96,11 +96,14 @@ class TagSerializer(serializers.ModelSerializer):
         model = Tag
         fields = ['id', 'name']
 
-
 class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
     class Meta:
         model = ProductImage
-        fields = ['id', 'product', 'image', 'color']
+        fields = ['id', 'image_url', 'color', 'product']
+    
+    def get_image_url(self, obj):
+        return obj.image.url if obj.image else None
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -154,6 +157,8 @@ class ProductSerializer(serializers.ModelSerializer):
     review_count = serializers.ReadOnlyField()
     size_chart = serializers.SerializerMethodField()
 
+    first_image_url = serializers.SerializerMethodField()
+    all_image_urls = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -162,7 +167,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'flash_sale_end','average_rating', 'review_count',
             'category', 'category_id', 'brand', 'brand_id',
             'tags', 'tag_ids', 'images', 'variants', 'size_chart',
-            'is_active', 'created_at', 'meta_title', 'meta_description'
+            'is_active', 'created_at', 'meta_title', 'meta_description', 'first_image_url', 'all_image_urls'
         ]
 
     def get_flash_sale_end(self, obj):
@@ -175,6 +180,13 @@ class ProductSerializer(serializers.ModelSerializer):
         if not size_chart or not size_chart.rows.exists():
             return None
         return SizeChartSerializer(size_chart).data
+    
+    def get_first_image_url(self, obj):
+        first_image = obj.images.first()
+        return first_image.image.url if first_image and first_image.image else None
+    
+    def get_all_image_urls(self, obj):
+        return [img.image.url for img in obj.images.all() if img.image]
 
 
 class CartItemSerializer(serializers.ModelSerializer):
