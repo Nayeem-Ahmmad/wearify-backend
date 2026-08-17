@@ -48,6 +48,11 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
 
+    #storage
+    'cloudinary_storage',
+    'django.contrib.staticfiles',
+    'cloudinary',
+
     # Local apps
     'shop',
 ]
@@ -335,3 +340,11 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 CORS_ALLOW_CREDENTIALS = True
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': config('CLOUDINARY_API_KEY'),
+    'API_SECRET': config('CLOUDINARY_API_SECRET'),
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
