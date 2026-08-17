@@ -21,8 +21,8 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
-# staticfiles/
-# static/
+staticfiles/
+static/
 *.sqlite3
 
 # IDE / Editor
@@ -49,7 +49,7 @@ media/
 .env
 db.sqlite3
 media/
-# staticfiles/
+staticfiles/
 logs/
 __pycache__/
 *.pyc

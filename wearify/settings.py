@@ -183,7 +183,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Whitenoise serves Django's own static files (admin CSS/JS, DRF browsable
 # API assets) directly from the app process — Render's free tier has no
 # separate static file server, so this is required in production.
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
