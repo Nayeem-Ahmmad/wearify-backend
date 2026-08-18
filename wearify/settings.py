@@ -1,6 +1,7 @@
 # settings.py - সম্পূর্ণ ফাইল
 
 import os
+import ssl
 import sys
 import dj_database_url
 from pathlib import Path
@@ -310,6 +311,12 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'Wearify <{EMAIL_HOST_USER}>')
+
+# Upstash uses TLS (rediss://) — Celery needs explicit SSL cert handling
+# for both the broker and result backend connections.
+CELERY_BROKER_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
+CELERY_REDIS_BACKEND_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
+
 CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=True, cast=bool)
 CELERY_TASK_EAGER_PROPAGATES = False
 EMAIL_TIMEOUT = 10
