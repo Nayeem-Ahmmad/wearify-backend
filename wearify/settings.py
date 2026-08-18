@@ -370,6 +370,13 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Dhaka'
 
+# Render's free tier can't run a separate Celery worker process, so tasks
+# execute synchronously (in the same request) instead of being queued.
+# Email sending will take slightly longer per-request, but no separate
+# worker service or paid plan is needed.
+CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=True, cast=bool)
+CELERY_TASK_EAGER_PROPAGATES = True
+
 # ==================== FRONTEND ====================
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
