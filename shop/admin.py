@@ -72,8 +72,8 @@ class ProductAdmin(ModelAdmin):
     inlines = [ProductImageInline, ProductVariantInline]
     change_list_template = 'admin/shop/product/change_list.html'
 
-    class Media:
-            js = ('shop/js/variant_color_sync.js',)
+    # class Media:
+    #         js = ('shop/js/variant_color_sync.js',)
 
     def profit_display(self, obj):
         return f"৳{obj.profit_per_unit:,.2f} ({obj.profit_margin_percent}%)"
