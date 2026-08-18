@@ -169,8 +169,11 @@ def send_order_confirmation_email_task(self, order_id):
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for email task")
     except Exception as exc:
-        logger.error(f"Failed to send confirmation email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
-        raise self.retry(exc=exc)
+        # Running eagerly (no separate Celery worker on the free tier), so
+        # retrying here would just block the same request again. Log and
+        # move on — the order itself must not fail because the email did.
+        logger.error(f"Failed to send confirmation email for order {order_id}: {exc}")
+        return
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def notify_admin_new_order_task(self, order_id):
@@ -201,8 +204,8 @@ def notify_admin_new_order_task(self, order_id):
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for admin email task")
     except Exception as exc:
-        logger.error(f"Failed to send admin notification (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
-        raise self.retry(exc=exc)
+        logger.error(f"Failed to send admin notification for order {order_id}: {exc}")
+        return
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -226,8 +229,8 @@ def send_payment_success_email_task(self, order_id):
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for payment email task")
     except Exception as exc:
-        logger.error(f"Failed to send payment success email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
-        raise self.retry(exc=exc)
+        logger.error(f"Failed to send payment success email for order {order_id}: {exc}")
+        return
 
 
 
@@ -248,8 +251,8 @@ def send_contact_message_task(self, name, email, message):
         )
         logger.info(f"Contact message email sent successfully from {email}")
     except Exception as exc:
-        logger.error(f"Failed to send contact message email (attempt {self.request.retries + 1}/{self.max_retries + 1}): {exc}")
-        raise self.retry(exc=exc)
+        logger.error(f"Failed to send contact message email from {email}: {exc}")
+        return
 
 
 
@@ -393,7 +396,7 @@ def send_password_reset_email_task(self, user_id, uid, token):
         logger.info(f"Password reset email sent to {user.email}")
     except Exception as exc:
         logger.error(f"Failed to send password reset email to {user.email}: {exc}")
-        raise self.retry(exc=exc)
+        return
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -474,4 +477,4 @@ def send_flash_sale_email_task(self, flash_sale_id):
         logger.info(f"Flash sale email sent to {subscribers.count()} subscribers for {flash_sale.title}")
     except Exception as exc:
         logger.error(f"Failed to send flash sale emails: {exc}")
-        raise self.retry(exc=exc)
+        return
