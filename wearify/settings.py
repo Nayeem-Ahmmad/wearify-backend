@@ -51,6 +51,9 @@ INSTALLED_APPS = [
     # Cloudinary Storage
     'cloudinary_storage',
     'cloudinary',
+
+    # For Email
+    'anymail',
     
     # Local apps
     'shop',
@@ -304,22 +307,16 @@ USE_I18N = True
 USE_TZ = True
 
 # ==================== EMAIL ====================
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f'Wearify <{EMAIL_HOST_USER}>')
+EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+ANYMAIL = {
+    'RESEND_API_KEY': config('RESEND_API_KEY'),
+}
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Wearify <onboarding@resend.dev>')
 
 # Upstash uses TLS (rediss://) — Celery needs explicit SSL cert handling
 # for both the broker and result backend connections.
 CELERY_BROKER_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
 CELERY_REDIS_BACKEND_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
-
-CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=True, cast=bool)
-CELERY_TASK_EAGER_PROPAGATES = False
-EMAIL_TIMEOUT = 10
 
 # ==================== SSLCOMMERZ ====================
 SSLCOMMERZ_STORE_ID = config('SSLCOMMERZ_STORE_ID')
