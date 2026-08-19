@@ -161,6 +161,7 @@ def send_order_confirmation_email_task(self, order_id):
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[recipient_email],
+            reply_to=['wearify.sells@gmail.com'],
         )
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
@@ -390,7 +391,10 @@ def send_password_reset_email_task(self, user_id, uid, token):
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[user.email],
+            reply_to=['wearify.sells@gmail.com'],
         )
+        
+
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
         logger.info(f"Password reset email sent to {user.email}")
