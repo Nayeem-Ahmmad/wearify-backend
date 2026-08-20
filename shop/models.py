@@ -30,6 +30,27 @@ class SiteSettings(models.Model):
 
 # --------------------------- User Side  ---------------------------------------------------------
 
+class Banner(models.Model):
+    title = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(upload_to='banners/')
+    mobile_image = models.ImageField(
+        upload_to='banners/mobile/',
+        blank=True,
+        null=True,
+        help_text='Optional. Portrait/compact crop for mobile devices. '
+                   'If empty, the main "image" is used as fallback.'
+    )
+    link = models.CharField(max_length=300, blank=True)  # e.g. /products/slug , for link 
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.title or f"Banner {self.id}"
+
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,

@@ -19,16 +19,33 @@ from django.utils.html import format_html
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale, NewsletterSubscriber, SizeChartRow, SizeChart, ReturnRequest
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, NewsletterSubscriber, SizeChartRow, SizeChart, ReturnRequest, Banner
 )
 from .tasks import send_order_confirmation_email_task
 from .tasks import send_flash_sale_email_task
 
 #------------------- Maintenance mode -------------------------------
 from .models import SiteSettings
+# @admin.register(SiteSettings)
+# class SiteSettingsAdmin(ModelAdmin):
+#     list_display = ['maintenance_mode']
+
+#     def has_add_permission(self, request):
+#         return not SiteSettings.objects.exists()
+
+#     def has_delete_permission(self, request, obj=None):
+#         return False
+
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(ModelAdmin):
     list_display = ['maintenance_mode']
+
+    fieldsets = (
+        ('Maintenance Mode', {
+            'fields': ('maintenance_mode', 'maintenance_message'),
+            'description': 'Turn this ON to temporarily take the website offline for visitors. Admin panel will still be accessible.',
+        }),
+    )
 
     def has_add_permission(self, request):
         return not SiteSettings.objects.exists()
@@ -36,10 +53,22 @@ class SiteSettingsAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-# class ProductImageInline(TabularInline):
-#     model = ProductImage
-#     extra = 1
-#     fields = ['image', 'color']
+    def changelist_view(self, request, extra_context=None):
+        obj = SiteSettings.objects.first()
+        if obj:
+            return redirect('admin:shop_sitesettings_change', obj.id)
+        return redirect('admin:shop_sitesettings_add')  
+
+@admin.register(Banner)
+class BannerAdmin(ModelAdmin):
+    list_display = ['title', 'image_preview', 'is_active', 'order', 'created_at']
+    list_editable = ['is_active', 'order']
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="height:50px; border-radius:6px;" />', obj.image.url)
+        return "-"
+    image_preview.short_description = 'Preview'
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage

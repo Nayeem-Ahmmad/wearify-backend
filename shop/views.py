@@ -16,7 +16,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 from .tasks import send_payment_success_email_task, send_contact_message_task
 from rest_framework.exceptions import NotFound
-
+from rest_framework.permissions import AllowAny
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -42,14 +42,14 @@ from django.db.models import F
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     Cart, CartItem, Coupon, Order, OrderItem, Payment,
-    Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, ReturnRequest
+    Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, ReturnRequest, Banner
 )
 from .serializers import (
     RegisterSerializer, UserProfileSerializer, AddressSerializer, CategorySerializer,
     BrandSerializer, TagSerializer, ProductSerializer,
     CartSerializer, CartItemSerializer, CouponSerializer,
     OrderSerializer, PaymentSerializer, ReviewSerializer,
-    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer, ReturnRequestSerializer, SharedWishlistSerializer
+    WishlistSerializer, UserAccountUpdateSerializer, ContactMessageSerializer, FlashSaleSerializer, FlashSaleDetailSerializer, StockNotificationSerializer, NewsletterSubscriberSerializer, ReturnRequestSerializer, SharedWishlistSerializer, BannerSerializer
 )
 
 class RegisterThrottle(AnonRateThrottle):
@@ -70,6 +70,10 @@ class ActiveFlashSaleView(generics.RetrieveAPIView):
             raise NotFound("No active flash sale")
         return flash_sale
 
+class BannerListView(generics.ListAPIView):
+    queryset = Banner.objects.filter(is_active=True)
+    serializer_class = BannerSerializer
+    permission_classes = [AllowAny]
 
 
 class ContactMessageView(APIView):

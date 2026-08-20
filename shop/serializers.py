@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Address, Category, Brand, Tag, Product,
     ProductImage, ProductVariant, Cart, CartItem, Coupon,
-    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, SizeChart, SizeChartRow, ReturnRequest
+    Order, OrderItem, Payment, Review, Wishlist, FlashSale, StockNotification, NewsletterSubscriber, SizeChart, SizeChartRow, ReturnRequest, Banner
 )
 
 from django.contrib.auth.password_validation import validate_password
@@ -28,6 +28,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+class BannerSerializer(serializers.ModelSerializer):
+    mobileImage = serializers.ImageField(source='mobile_image', required=False, allow_null=True)
+    class Meta:
+        model = Banner
+        fields = ['id', 'title', 'image', 'mobileImage', 'link', 'order']
 
 class ContactMessageSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
